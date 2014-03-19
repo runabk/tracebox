@@ -1,6 +1,6 @@
 Name:           tracebox
-Version:        0.0
-Release:        3%{?dist}
+Version:        0.1~td3.0
+Release:        1%{?dist}
 Summary:        -
 
 Group:          Applications/Internet
@@ -9,8 +9,8 @@ URL:            http://www.tracebox.org
 Source:         %{name}-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
-BuildRequires:  libpcap-devel, libdnet-devel, python-devel
-Requires:       libpcap, libdnet, scapy, pcapy
+BuildRequires:  libpcap-devel, libdnet-devel, lua-devel, python-devel
+Requires:       libpcap, libdnet, lua, scapy, pcapy
 
 %description
 

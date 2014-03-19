@@ -75,9 +75,7 @@ if [ -e debian/changelog ] ; then
 fi
 
 if [ -e rpm.conf ] ; then
-   echo "v=$PACKAGE_VERSION"
    . ./rpm.conf
-   echo "U=$UPSTREAM_PACKAGE"
 fi
 
 # ====== Create upstream package ============================================

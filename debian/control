@@ -18,6 +18,13 @@ Depends: liblua5.2-0,
          libpcap0.8,
          ${misc:Depends},
          ${shlibs:Depends}
+Recommends: iputils-ping,
+            iputils-tracepath,
+            netperfmeter,
+            rsplib-tools,
+            subnetcalc,
+            traceroute,
+            whois
 Description: Tracebox
  Tracebox is a tool that allows to detect middleboxes on any paths, i.e.,
  between a source and any destination. Tracebox can be viewed as a tool similar
