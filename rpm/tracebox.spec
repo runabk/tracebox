@@ -23,13 +23,13 @@ Requires:       libpcap, libdnet, lua, scapy, pcapy
 autoreconf -if
 
 
-%configure --disable-scripts
+%configure --disable-scripts --prefix=/usr
 make %{?_smp_mflags}
 
 
 %install
 rm -rf $RPM_BUILD_ROOT
-make install DESTDIR=$RPM_BUILD_ROOT
+make DESTDIR=$RPM_BUILD_ROOT install
 
 
 %clean
@@ -38,11 +38,10 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root,-)
-%doc
-%{_libdir}/*
-%{_docdir}/*
-%{_bindir}/*
-%exclude %{_includedir}/*
+%{_bindir}/luatracebox
+%{_bindir}/tracebox
+%{_datadir}/man/man1/tracebox.1.gz
+%{_datadir}/tracebox/*.tbx
 
 
 %changelog
