@@ -20,7 +20,9 @@ Requires:       libpcap, libdnet, lua, scapy, pcapy
 
 
 %build
-./bootstrap.sh
+git clone --depth=1 https://github.com/gdetal/libcrafter.git noinst/libcrafter
+git clone --depth=1 https://github.com/bhesmans/click.git noinst/click
+autoreconf -if
 
 
 %configure --disable-scripts --prefix=/usr
