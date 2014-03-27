@@ -20,7 +20,7 @@ Requires:       libpcap, libdnet, lua, scapy, pcapy
 
 
 %build
-autoreconf -if
+./bootstrap.sh
 
 
 %configure --disable-scripts --prefix=/usr
