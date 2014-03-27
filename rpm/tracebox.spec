@@ -18,7 +18,11 @@ Requires:       libpcap, libdnet, lua, scapy, pcapy
 %prep
 %setup -q
 
+
 %build
+autoreconf -if
+
+
 %configure --disable-scripts
 make %{?_smp_mflags}
 
