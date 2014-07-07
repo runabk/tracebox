@@ -2,8 +2,8 @@ AC_INIT([tracebox], [0.1~td4.0], [gregory.detal@uclouvain.be])
 
 AC_PREREQ([2.59])
 AM_INIT_AUTOMAKE([1.10 tar-pax -Werror -Wall no-define foreign])
-m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 
+AM_PROG_AR
 LT_INIT
 
 AC_CONFIG_MACRO_DIR([m4])
