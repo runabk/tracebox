@@ -20,11 +20,8 @@ Requires:       libpcap, libdnet, lua, scapy, pcapy
 
 
 %build
-mkdir -p noinst
-ls -alR noinst
-# git clone --depth=1 https://github.com/gdetal/libcrafter.git noinst/libcrafter
-# git clone --depth=1 https://github.com/bhesmans/click.git noinst/click
-ls -al tests -R
+git submodule init
+git submodule update
 autoreconf -if
 
 
