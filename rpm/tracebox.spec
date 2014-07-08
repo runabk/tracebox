@@ -9,7 +9,7 @@ URL:            http://www.tracebox.org
 Source:         %{name}-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
-BuildRequires:  autoconf, automake, libtool, libpcap-devel, libdnet-devel, lua-devel, python-devel
+BuildRequires:  autoconf, automake, libtool, libpcap-devel, libdnet-devel, lua-devel, python-devel, git, fakeroot
 Requires:       libpcap, libdnet, lua, scapy, pcapy
 
 %description
@@ -20,8 +20,10 @@ Requires:       libpcap, libdnet, lua, scapy, pcapy
 
 
 %build
-git submodule init
-git submodule update
+rm -rf noinst/libcrafter
+rm -rf tests/tools/click
+git clone --depth=1 https://github.com/gdetal/libcrafter.git noinst/libcrafter
+git clone --depth=1 https://github.com/bhesmans/click.git tests/tools/click
 autoreconf -if
 
 
