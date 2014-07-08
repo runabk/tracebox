@@ -28,7 +28,7 @@ ls -al tests -R
 autoreconf -if
 
 
-%configure --disable-scripts --prefix=/usr
+%configure --enable-tests --disable-scripts --prefix=/usr
 make %{?_smp_mflags}
 
 
