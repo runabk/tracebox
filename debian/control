@@ -1,27 +1,28 @@
 Source: tracebox
 Section: net
 Priority: extra
-<<<<<<< HEAD
-Maintainer: Gregory Detal <gregory.detal@uclouvain.be>
+Maintainer: Olivier Tilmans <olivier.tilmans@uclouvain.be>
 Build-Depends: autoconf,
                autotools-dev,
                debhelper (>= 8.0.0),
-               liblua5.2-dev,
+               gcc (>= 4.8),
+               git,
+               libcurl4-gnutls-dev,
+               libjson0-dev,
+               liblua5.1-dev,
+               libnetfilter-queue-dev,
                libpcap-dev,
-               lua5.2,
-               pkg-config
-Standards-Version: 3.9.4
-=======
-Maintainer: Olivier Tilmans <olivier.tilmans@uclouvain.be>
-Build-Depends: gcc (>= 4.8), debhelper (>= 8.0.0), autotools-dev, autoconf, libpcap-dev, liblua5.1-dev, git, libnetfilter-queue-dev, libjson0-dev, libcurl4-gnutls-dev, luarocks
+               lua-ldoc,
+               luarocks
 Standards-Version: 0.3
->>>>>>> upstream/master
 Homepage: http://www.tracebox.org
 
 Package: tracebox
 Architecture: any
-<<<<<<< HEAD
-Depends: liblua5.2-0,
+Depends: libcurl4-gnutls-dev,
+         libjson0,
+         liblua5.1-0,
+         libnetfilter-queue1,
          libpcap0.8,
          ${misc:Depends},
          ${shlibs:Depends}
@@ -32,9 +33,6 @@ Recommends: iputils-ping,
             subnetcalc,
             traceroute,
             whois
-=======
-Depends: ${shlibs:Depends}, ${misc:Depends}, liblua5.1-0, libpcap0.8, libnetfilter-queue1, libjson0, libcurl4-gnutls-dev
->>>>>>> upstream/master
 Description: Tracebox
  Tracebox is a tool that allows to detect middleboxes on any paths, i.e.,
  between a source and any destination. Tracebox can be viewed as a tool similar
