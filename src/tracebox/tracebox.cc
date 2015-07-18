@@ -1,32 +1,29 @@
-/*
- *  Copyright (C) 2013  Gregory Detal <gregory.detal@uclouvain.be>
+/**
+ * Tracebox -- A middlebox detection tool
  *
- *  This program is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU General Public License
- *  as published by the Free Software Foundation; either version 2
- *  of the License, or (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301, USA.
+ *  Copyright 2013-2015 by its authors.
+ *  Some rights reserved. See LICENSE, AUTHORS.
  */
 
 #include "tracebox.h"
 #include "crafter/Utils/IPResolver.h"
 #include "script.h"
-#include "PartialHeader.h"
 #include "PacketModification.h"
+
 
 #include <cstdlib>
 #include <cstring>
+#include <stdio.h>
 #include <iostream>
 #include <vector>
+#include <sstream>
+
+#ifdef HAVE_LIBJSON
+#include <json/json.h>
+#endif
+#ifdef HAVE_JSONC
+#include <json-c/json.h>
+#endif
 
 extern "C" {
 #include <pcap.h>
@@ -55,6 +52,10 @@ static string destination;
 static string iface;
 static bool resolve = true;
 static bool verbose = false;
+static json_object * jobj = NULL;
+static json_object *j_results = NULL;
+
+double tbx_default_timeout = 1;
 
 template<int n> void BuildNetworkLayer(Packet *) { }
 template<int n> void BuildTransportLayer(Packet *, int) { }
@@ -117,10 +118,10 @@ Packet *BuildProbe(int net, int tr, int dport)
 	return pkt;
 }
 
-string GetDefaultIface(bool ipv6)
+string GetDefaultIface(bool ipv6, const string &addr)
 {
 	struct sockaddr_storage sa;
-	int i, fd, af = ipv6 ? AF_INET6 : AF_INET;
+	int fd, af = ipv6 ? AF_INET6 : AF_INET;
 	socklen_t n;
 	size_t sa_len;
 	struct ifaddrs *ifaces, *ifa;
@@ -130,18 +131,19 @@ string GetDefaultIface(bool ipv6)
 		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&sa;
 		sin6->sin6_family = af;
 		sa_len = sizeof(*sin6);
-		inet_pton(af, "2001:6a8:3080:2:94b0:b600:965:8cf5", &sin6->sin6_addr);
+		inet_pton(af, addr.c_str(), &sin6->sin6_addr);
 		sin6->sin6_port = htons(666);
 	} else {
 		struct sockaddr_in *sin = (struct sockaddr_in *)&sa;
 		sin->sin_family = af;
 		sa_len = sizeof(*sin);
-		inet_pton(af, "130.104.230.45", &sin->sin_addr);
+		inet_pton(af, addr.c_str(), &sin->sin_addr);
 		sin->sin_port = htons(666);
 	}
 
 	if ((fd = socket(af, SOCK_DGRAM, 0)) < 0)
 		goto out;
+
 	if (connect(fd, (struct sockaddr *)&sa, sa_len) < 0) {
 		perror("connect");
 		goto error;
@@ -163,8 +165,8 @@ string GetDefaultIface(bool ipv6)
 					(void *)&((struct sockaddr_in *)ifa->ifa_addr)->sin_addr;
 			saddr = ipv6 ? (void *)&((struct sockaddr_in6 *)&sa)->sin6_addr :
 					(void *)&((struct sockaddr_in *)&sa)->sin_addr;
-			memcpy(name, ifa->ifa_name, IF_NAMESIZE);
 			if (!memcmp(ifa_addr, saddr, len)) {
+				memcpy(name, ifa->ifa_name, IF_NAMESIZE);
 				freeifaddrs(ifaces);
 				close(fd);
 				return name;
@@ -207,15 +209,47 @@ bool pcapParse(const string& name, string& output, string& input)
 	return true;
 }
 
-static pcap_t *pd = NULL;
+static pcap_t *pd = NULL, *save_d = NULL;
 static int rfd;
 static pcap_t *rd = NULL;
-static pcap_dumper_t *pdumper;
+static pcap_dumper_t *pdumper, *save_dumper = NULL;
+static const char *pcap_filename = DEFAULT_PCAP_FILENAME;
+#ifdef HAVE_CURL
+static const char * upload_url = DEFAULT_URL;
+static bool upload = true;
+#endif
 
-Packet* PcapSendRecv(Packet *probe, const string& iface, double timeout, int retry)
+int openPcap(){
+	OpenPcapDumper(DLT_RAW, pcap_filename, save_d, save_dumper);
+	if(save_dumper == NULL){
+		cerr << "Error while opening pcap file : " << pcap_geterr(save_d) << endl;
+		return -1;
+	}
+	return 0;
+}
+
+void writePcap(Packet* p){
+	struct pcap_pkthdr *hdr= (pcap_pkthdr *) malloc(sizeof(*hdr));
+	hdr->len = p->GetSize();
+	hdr->caplen = p->GetSize();
+	gettimeofday(&hdr->ts, NULL);
+	pcap_dump(reinterpret_cast<u_char*>(save_dumper), hdr, p->GetRawPtr());
+}
+
+void closePcap(){
+	pcap_dump_flush(save_dumper);
+	pcap_close(save_d);
+	pcap_dump_close(save_dumper);
+#ifdef HAVE_CURL
+	if (upload)
+		curlPost(pcap_filename, upload_url);
+#endif
+}
+
+
+Packet* PcapSendRecv(Packet *probe, const string& iface)
 {
 	struct pcap_pkthdr hdr1, hdr2;
-	int ret;
 	uint8_t *packet;
 	Packet* reply = NULL;
 	string in_file, out_file;
@@ -274,6 +308,7 @@ Packet* PcapSendRecv(Packet *probe, const string& iface, double timeout, int ret
 		reply->PacketFromIPv6(packet, hdr1.len);
 		break;
 	default:
+		delete reply;
 		return NULL;
 	}
 
@@ -295,191 +330,27 @@ string resolve_name(int proto, string& name)
 
 string iface_address(int proto, string& iface)
 {
-	switch (proto) {
-	case IP::PROTO:
-		if (isPcap(iface))
-			return PCAP_IPv4;
-		return GetMyIP(iface);
-	case IPv6::PROTO:
-		if (isPcap(iface))
-			return PCAP_IPv6;
-		return GetMyIPv6(iface, false);
-	default:
-		return "";
-	}
-}
-
-Layer *GetLayer(Packet *pkt, int proto_id)
-{
-	LayerStack::const_iterator it;
-
-	for (it = pkt->begin() ; it != pkt->end() ; it++) {
-		Layer *l = *it;
-		if (l->GetID() == proto_id)
-			return l;
-	}
-	return NULL;
-}
-
-set<int> GetAllProtos(Packet *p1, Packet *p2)
-{
-	set<int> ret;
-	LayerStack::const_iterator it;
-
-	for (it = p1->begin() ; it != p1->end() ; it++)
-		ret.insert((*it)->GetID());
-	for (it = p2->begin() ; it != p2->end() ; it++)
-		ret.insert((*it)->GetID());
-	return ret;
-}
-
-void ComputeDifferences(PacketModifications *modifs,
-						Layer *l1, Layer *l2)
-{
-	byte* this_layer = new byte[l1->GetSize()];
-	byte* that_layer = new byte[l1->GetSize()];
-
-	/* Compute difference between fields */
-	for(size_t i = 0 ; i < min(l1->GetFieldsSize(), l2->GetFieldsSize()) ; i++) {
-		memset(this_layer, 0, l1->GetSize());
-		memset(that_layer, 0, l1->GetSize());
-
-		l1->GetField(i)->Write(this_layer);
-		l2->GetField(i)->Write(that_layer);
-		if (memcmp(this_layer, that_layer, l1->GetSize()))
-			modifs->push_back(new Modification(l1->GetID(), l1->GetField(i), l2->GetField(i)));
-	}
-
-	/* TODO do something more clever here
-	 * (ex: identify the offset where the change occured)
-	 */
-	if (l1->GetPayload().GetSize() < l2->GetPayload().GetSize())
-		modifs->push_back(new Addition(l1));
-	else if (l1->GetPayload().GetSize() > l2->GetPayload().GetSize())
-		modifs->push_back(new Deletion(l1));
-	else if (memcmp(l1->GetPayload().GetRawPointer(), l2->GetPayload().GetRawPointer(), l1->GetPayload().GetSize()))
-		modifs->push_back(new Modification(l1, l2));
-
-	delete[] this_layer;
-	delete[] that_layer;
-}
-
-PacketModifications* ComputeDifferences(Packet *orig, Packet *modified, bool partial)
-{
-	PacketModifications *modifs = new PacketModifications(orig, modified);
-	set<int> protos = GetAllProtos(orig, modified);
-	set<int>::iterator it = protos.begin();
-
-	for ( ; it != protos.end() ; it++) {
-		Layer *l1 = GetLayer(orig, *it);
-		Layer *l2 = GetLayer(modified, *it);
-
-		if (l1 && l2)
-			ComputeDifferences(modifs, l1, l2);
-		else if (l1 && !l2 && !partial)
-			modifs->push_back(new Deletion(l1));
-		else if (!l1 && l2)
-			modifs->push_back(new Addition(l2));
-	}
-
-	return modifs;
-}
-
-Packet* TrimReplyIPv4(Packet *pkt, Packet *rcv, bool *partial)
-{
-	IP *ip = GetIP(*rcv);
-
-	*partial = false;
-	/* Remove any ICMP extension. */
-	if (ip->GetTotalLength() < rcv->GetSize()) {
-		RawLayer *raw = GetRawLayer(*rcv);
-		int len = raw->GetSize() - (rcv->GetSize() - ip->GetTotalLength());
-		RawLayer new_raw(raw->GetPayload().GetRawPointer(), len);
-
-		rcv->PopLayer();
-		if (len)
-			rcv->PushLayer(new_raw);
-	} else if (rcv->GetSize() < ip->GetTotalLength()) {
-		/* We have received a partial header */
-		RawLayer *raw = GetRawLayer(*rcv);
-		Layer *new_layer = NULL;
-
-		if (!raw)
-			return rcv;
-
-		switch(ip->GetProtocol()) {
-		case TCP::PROTO:
-			new_layer = new PartialTCP(*raw);
-			*partial = true;
-			break;
+	try {
+		switch (proto) {
+		case IP::PROTO:
+			if (isPcap(iface))
+				return PCAP_IPv4;
+			return GetMyIP(iface);
+		case IPv6::PROTO:
+			if (isPcap(iface))
+				return PCAP_IPv6;
+			return GetMyIPv6(iface, false);
 		default:
-			return rcv;
+			return "";
 		}
-		if (new_layer) {
-			rcv->PopLayer();
-			rcv->PushLayer(new_layer);
-		}
-	}
-
-	return rcv;
+	} catch (std::runtime_error &ex) { return ""; }
 }
 
-Packet* TrimReplyIPv6(Packet *pkt, Packet *rcv)
-{
-	IPv6 *ip = GetIPv6(*rcv);
-
-	/* Remove any extension. */
-	if (ip->GetPayloadLength() + 40 < rcv->GetSize()) {
-		RawLayer *raw = GetRawLayer(*rcv);
-		int len = raw->GetSize() - (rcv->GetSize() - (ip->GetPayloadLength() + 40));
-		RawLayer new_raw(raw->GetPayload().GetRawPointer(), len);
-
-		rcv->PopLayer();
-		if (len)
-			rcv->PushLayer(new_raw);
-	}
-
-	return rcv;
-}
-
-PacketModifications* RecvReply(int proto, Packet *pkt, Packet **rcv)
-{
-	ICMPLayer *icmp = (*rcv)->GetLayer<ICMPLayer>();
-	RawLayer *raw = (*rcv)->GetLayer<RawLayer>();
-	Packet *cnt;
-	bool partial = false;
-
-	if (!icmp || !raw)
-		return NULL;
-
-	cnt = new Packet;
-	switch (proto) {
-	case IP::PROTO:
-		cnt->PacketFromIP(*raw);
-		/* We might receive an ICMP without the complete
-		 * echoed packet or with ICMP extensions. We thus
-		 * remove undesired parts and parse partial headers.
-		 */
-		cnt = TrimReplyIPv4(pkt, cnt, &partial);
-		break;
-	case IPv6::PROTO:
-		cnt->PacketFromIPv6(*raw);
-		cnt = TrimReplyIPv6(pkt, cnt);
-		break;
-	default:
-		delete cnt;
-		return NULL;
-	}
-
-	delete *rcv;
-	*rcv = cnt;
-
-	return ComputeDifferences(pkt, cnt, partial);
-}
 
 static int Callback(void *ctx, int ttl, string& router,
 	const Packet * const probe, Packet *rcv, PacketModifications *mod)
 {
+	(void)ctx;
 	IPLayer *ip = probe->GetLayer<IPLayer>();
 
 	if (ttl == 1)
@@ -491,75 +362,126 @@ static int Callback(void *ctx, int ttl, string& router,
 			cout << ttl << ": " << router << " ";
 		else
 			cout << ttl << ": " << GetHostname(router) << " (" << router << ") ";
-		if (mod)
+		if (mod) {
 			mod->Print(cout, verbose);
+			delete mod;
+		}
 		cout << endl;
+		delete rcv;
 	} else
 		cout << ttl << ": *" << endl;
 
 	return 0;
 }
 
-bool validIPv4Address(const string& ipAddress) {
-        struct in_addr addr4;
-        inet_pton(AF_INET, ipAddress.c_str(), &(addr4));
-        return !IN_LOOPBACK(addr4.s_addr);
-}
+static int Callback_JSON(void *ctx, int ttl, string& router,
+		const Packet * const probe, Packet *rcv, PacketModifications *mod)
+{
+	(void)ctx;
+	IPLayer *ip = probe->GetLayer<IPLayer>();
 
-bool validIPv6Address(const string& ipAddress) {
-        struct in6_addr addr6;
-        inet_pton(AF_INET6, ipAddress.c_str(), &addr6);
-	return !IN6_LOOPBACK(&addr6);
+	if (ttl == 1){
+		json_object_object_add(jobj,"addr", json_object_new_string(ip->GetDestinationIP().c_str()));
+		json_object_object_add(jobj,"name", json_object_new_string(destination.c_str()));
+		json_object_object_add(jobj,"max_hops", json_object_new_int(hops_max));
+	}
+
+	json_object * hop = json_object_new_object();
+
+	if (rcv) {
+			ip = rcv->GetLayer<IPLayer>();
+
+
+			json_object_object_add(hop,"hop", json_object_new_int(ttl));
+			json_object_object_add(hop,"from", json_object_new_string(router.c_str()));
+			if (resolve)
+				json_object_object_add(hop,"name", json_object_new_string(GetHostname(router).c_str()));
+			if (mod){
+				json_object *modif = json_object_new_array();
+				json_object *icmp = json_object_new_array();
+				json_object *add = json_object_new_array();
+				json_object *del = json_object_new_array();
+
+				mod->Print_JSON(modif, icmp, add, del, verbose);
+
+				json_object_object_add(hop,"Modifications", modif);
+				json_object_object_add(hop,"Aditions", add);
+				json_object_object_add(hop,"Deletions", del);
+				delete mod;
+			}
+		delete rcv;
+	}
+	else{
+		json_object_object_add(hop,"hop", json_object_new_int(ttl));
+		json_object_object_add(hop,"from", json_object_new_string("*"));
+	}
+
+	json_object_array_add(j_results,hop);
+
+	return 0;
 }
 
 bool validIPAddress(bool ipv6, const string& ipAddress)
 {
 	if (ipv6)
-		return validIPv6Address(ipAddress);
+		return validateIpv6Address(ipAddress);
 	else
-		return validIPv4Address(ipAddress);
+		return validateIpv4Address(ipAddress);
 }
 
-int doTracebox(Packet *pkt, tracebox_cb_t *callback, string& err, void *ctx)
+IPLayer* probe_sanity_check(Packet *pkt, string& err, string& iface)
 {
 	IPLayer *ip = pkt->GetLayer<IPLayer>();
 	string sourceIP;
 	string destinationIP;
 
-	ip = pkt->GetLayer<IPLayer>();
 	if (!ip) {
 		err = "You need to specify at least an IPv4 or IPv6 header";
-		return -1;
+		return NULL;
 	}
 
 	destinationIP = ip->GetDestinationIP();
+	sourceIP = ip->GetSourceIP();
 	if ((destinationIP == "0.0.0.0" || destinationIP == "::") && destination != "")
 		destinationIP = resolve_name(ip->GetID(), destination);
 
-	iface = iface == "" ? GetDefaultIface(ip->GetID() == IPv6::PROTO) : iface;
-	if (iface == "") {
-		err = "You need to specify an interface";
-		return -1;
-	}
-
 	if (destinationIP == "" || destinationIP == "0.0.0.0" || destinationIP == "::") {
 		err = "You need to specify a destination";
-		return -1;
+		return NULL;
 	}
 
 	if (!validIPAddress(ip->GetID() == IPv6::PROTO, destinationIP)) {
-		err = "The specified address is not valid";
-		return -1;
+		err = "The specified destination address is not valid";
+		return NULL;
 	}
 
-	sourceIP = iface_address(ip->GetID(), iface);
-	if (sourceIP == "") {
-		err = "There is no source address for the specified protocol";
-		return -1;
+	iface = iface == "" ? GetDefaultIface(ip->GetID() == IPv6::PROTO, destinationIP) : iface;
+	if (iface == "") {
+		err = "You need to specify an interface as there is no default one";
+		return NULL;
 	}
 
-	ip->SetSourceIP(sourceIP);
+	if (sourceIP == "" || sourceIP == "0.0.0.0" || sourceIP == "::") {
+		sourceIP = iface_address(ip->GetID(), iface);
+		if (sourceIP == "") {
+			err = "There is no source address for the specified protocol";
+			return NULL;
+		}
+		ip->SetSourceIP(sourceIP);
+	} else if (!validIPAddress(ip->GetID() == IPv6::PROTO, sourceIP)) {
+		err = "The specified source address is not valid";
+		return NULL;
+	}
+
 	ip->SetDestinationIP(destinationIP);
+	return ip;
+}
+
+int doTracebox(Packet *pkt, tracebox_cb_t *callback, string& err, void *ctx)
+{
+	IPLayer *ip = probe_sanity_check(pkt, err, iface);
+	if (!ip)
+		return -1;
 
 	for (int ttl = 1; ttl <= hops_max; ++ttl) {
 		Packet* rcv = NULL;
@@ -577,14 +499,23 @@ int doTracebox(Packet *pkt, tracebox_cb_t *callback, string& err, void *ctx)
 		pkt->PreCraft();
 
 		if (isPcap(iface))
-			rcv = PcapSendRecv(pkt, iface, 1, 3);
-		else
-			rcv = pkt->SendRecv(iface, 1, 3);
+			rcv = PcapSendRecv(pkt, iface);
+		else{ // Write both pkt & rcv to pcap file
+			rcv = pkt->SendRecv(iface, tbx_default_timeout, 3);
+			if(!isPcap(iface))
+				writePcap(pkt);
+		}
 
 		/* If we have a reply then compute the differences */
 		if (rcv) {
+			if(!isPcap(iface)){
+				Packet p;
+				/* Removing Ethernet Layer for storage */
+				p = rcv->SubPacket(1,rcv->GetLayerCount());
+				writePcap(&p);
+			}
 			sIP = rcv->GetLayer<IPLayer>()->GetSourceIP();
-			mod = RecvReply(ip->GetID(), pkt, &rcv);
+			mod = PacketModifications::ComputeModifications(pkt, &rcv);
 		}
 
 		/* The callback can stop the iteration */
@@ -592,26 +523,33 @@ int doTracebox(Packet *pkt, tracebox_cb_t *callback, string& err, void *ctx)
 			return 0;
 
 		/* Stop if we reached the server */
-		if (rcv && sIP == destinationIP)
+		if (rcv && sIP == ip->GetDestinationIP())
 			return 1;
 	}
-
 	return 0;
 }
 
 int main(int argc, char *argv[])
 {
-	char c;
-	int ret = 1;
+	int c;
+	int ret = EXIT_SUCCESS;
 	int dport = 80;
 	int net_proto = IP::PROTO, tr_proto = TCP::PROTO;
 	const char *script = NULL;
 	const char *probe = NULL;
 	Packet *pkt = NULL;
-	IPLayer *ip = NULL;
 	string err;
+	bool inline_script = false;
 
-	while ((c = getopt(argc, argv, ":i:m:s:p:d:hnv6u")) != -1) {
+	tracebox_cb_t *callback = Callback;
+
+	/* disable libcrafter warnings */
+	ShowWarnings = 0;
+	while ((c = getopt(argc, argv, "l:i:m:s:p:d:f:hnv6uwjt:"
+#ifdef HAVE_CURL
+					"qc:"
+#endif
+					)) != -1) {
 		switch (c) {
 			case 'i':
 				iface = optarg;
@@ -640,26 +578,57 @@ int main(int argc, char *argv[])
 			case 'v':
 				verbose = true;
 				break;
+			case 'j':
+				callback = Callback_JSON;
+				jobj = json_object_new_object();
+				j_results = json_object_new_array();
+				break;
+#ifdef HAVE_CURL
+			case 'q' :
+				upload = false;
+				break;
+			case 'c':
+				upload_url = optarg;
+				break;
+#endif
+			case 'f' :
+				pcap_filename = optarg;
+				break;
 			case 'h':
 				ret = 0;
 				goto usage;
-			case ':':
-				cerr << "missing option argument" << endl;
+			case 'w':
+				ShowWarnings = 1;
+				break;
+			case 'l':
+				script = optarg;
+				inline_script = true;
+				break;
+			case 't':
+				tbx_default_timeout = strtod(optarg, NULL);
+				break;
+			case '?':
+				std::cerr << "Unknown option `-" << optopt << "'." << std::endl;
 			default:
 				goto usage;
 		}
 	}
 
 	if (getuid() != 0) {
-		fprintf(stderr, "tracebox requires superuser permissions!\n");
+		cerr << "tracebox requires superuser permissions!" << endl;
 		return 1;
 	}
 
-	/* disable libcrafter warnings */
-	ShowWarnings = 0;
+	if (optind < argc) {
+		destination = argv[optind];
+	} else if (!inline_script && ! script) {
+		cerr << "You must specify a destination host" << endl;
+		return 1;
+	}
 
-	if (optind < argc)
-		destination = argv[argc-1];
+	if(openPcap()){
+		return EXIT_FAILURE;
+	}
 
 	if (!probe && !script) {
 		pkt = BuildProbe(net_proto, tr_proto, dport);
@@ -667,8 +636,12 @@ int main(int argc, char *argv[])
 		string cmd = probe;
 		pkt = script_packet(cmd);
 	} else if (script && !probe) {
-		string f = script;
-		script_execfile(f);
+		int rem_argc = argc - optind;
+		char **rem_argv = rem_argc ? &argv[optind] : NULL;
+		if (inline_script)
+			ret = script_exec(script, rem_argc, rem_argv);
+		else
+			ret = script_execfile(script, rem_argc, rem_argv);
 		goto out;
 	} else {
 		cerr << "You cannot specify a script and a probe at the same time" << endl;
@@ -676,18 +649,26 @@ int main(int argc, char *argv[])
 	}
 
 	if (!pkt)
-		goto out;
+		return EXIT_FAILURE;
 
-	if (doTracebox(pkt, Callback, err) < 0) {
+	if (doTracebox(pkt, callback, err) < 0) {
 		cerr << "Error: " << err << endl;
 		goto usage;
 	}
+
+	delete pkt;
+
+	if (jobj != NULL) {
+		json_object_object_add(jobj,"Hops", j_results);
+		printf ("%s\n",json_object_to_json_string(jobj));
+	}
 out:
-	return 0;
+	closePcap();
+	return ret;
 
 usage:
-	fprintf(stderr, "Usage:\n"
-"  %s [ OPTIONS ] host\n"
+	cerr << "Usage:\n"
+"  " << argv[0] << " [ OPTIONS ] {host | [Lua argument list]}\n"
 "Options are:\n"
 "  -h                          Display this help and exit\n"
 "  -n                          Do not resolve IP adresses\n"
@@ -696,11 +677,27 @@ usage:
 "  -d port                     Use the specified port for static probe\n"
 "                              generated. Default is 80.\n"
 "  -i device                   Specify a network interface to operate with\n"
-"  -m hops_max                 Set the max number of hops (max TTL to be\n"
-"                              reached). Default is 30.\n"
+"  -m hops_max                 Set the max number of hops (max TTL to be reached).\n"
+"                              Default is 30.\n"
 "  -v                          Print more information.\n"
+"  -j                          Change the format of the output to JSON.\n"
+"  -t timeout                  Timeout to wait for a reply after sending a packet.\n"
+"                              Default is 1 sec, accepts decimals.\n"
 "  -p probe                    Specify the probe to send.\n"
-"  -s script                   Run a script.\n"
-"", argv[0]);
+"  -s script_file              Run a script file.\n"
+"  -l inline_script            Run a script.\n"
+"  -w                          Show warnings when crafting packets.\n"
+#ifdef HAVE_LIBCURL
+"  -q                          Cancel automatic upload of the capture file.\n"
+"  -c server_url               Specify a server where captured packets will be sent.\n"
+"                              Default is " DEFAULT_URL ".\n"
+#endif
+"  -f filename                 Specify the name of the pcap file.\n"
+"                              Default is " DEFAULT_PCAP_FILENAME ".\n"
+"\n"
+"Every argument passed after the options in conjunction with -s or -l will be passed\n"
+"to the lua interpreter and available in a global vector of strings named 'argv',\n"
+"in the order they appeared on the command-line.\n"
+	<< endl;
 	return ret;
 }

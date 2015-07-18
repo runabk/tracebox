@@ -12,19 +12,107 @@
 
 ### Linux
 
-Requirements: autotools, automake, libtool, liblua-dev, libpcap-dev
+Requirements: autotools, automake, libtool, liblua-dev, libpcap-dev, libjson0, libjson0-dev, libcurl4-gnutls-dev, lua-ldoc, libnetfilter-queue-dev
+
 To build:
 
     $ ./bootstrap.sh
+    $ ./configure [--prefix=install_prefix [--enable-tests][--enable-curl]]
     $ make
     # make install
+
+You can grab the latest build here (source package or *.deb):
+
+https://drone.io/github.com/tracebox/tracebox/files
+
+Tracebox has been tested and works both with Lua 5.1 and 5.2
 
 ### OpenWRT
 
 The package is available at http://github.com/tracebox/openwrt.
+
 Inside the OpenWRT SDK:
 
     $ echo "src-git tracebox git://github.com/tracebox/openwrt.git" >> feeds.conf.default
     $ ./scripts/feeds install -a tracebox
     $ make menuconfig # select tracebox in "Network"
     $ make package/tracebox/compile # should generate a package in bin/<target>/packages/tracebox_*.ipk
+
+This is currently unmaintained.
+
+### Android
+
+An Android build script is available at https://github.com/tracebox/android
+
+Your phone will need to be rooted.
+
+## Documentation
+
+Upon installation, see `man tracebox` and in `/usr/local/share/doc/tracebox`
+
+The Lua API is (should) be documented and is available at http://tracebox.org/lua_doc.
+It can be generated using [LDoc](https://github.com/stevedonovan/LDoc) from the doc directory (see config.ld):
+
+    $ ldoc .
+
+The documentation should be created under doc/html
+
+## JSON Output Format
+
+More detailled information about the successive hops can be obtained using the -j option,
+this will as well change the output mode to JSON
+
+```javascript
+{
+    "addr"     : "IP of the destination",
+    "name"     : "Name of the destination [Optional]",
+    "max_hops" : "Number of maximum hops",
+    "Hops"     : [ /* Array containing each hop information */
+        {
+            "hop"           : "Corresponding TTL/hop limit",
+            "from"          : "IP address of that hop",
+            "name"          : "Name of the hop [Optional]",
+            "Modifications" : [
+                // if tracebox was called with -v :
+                    "Name of the modification" : {
+                        "Expected" : "Value injected",
+                        "Received" : "Value receveid"
+                    },
+                // else:
+                    "Name of the modification"
+            ],
+            "Additions"    : [
+                // if tracebox was called with -v :
+                    {
+                        "Name of the modification" : {
+                            "Info": "Information added"
+                        },
+                    }
+                // else:
+                    "Name of the field(s) added"
+            ],
+            "Deletions"     : [
+                // if tracebox was called with -v :
+                    {
+                        "Name of the modification" : {
+                            "Info": "Information deleted"
+                        },
+                    }
+                // else:
+                    "Name of the field(s) deleted"
+            ],
+            "ICMPExtension" : /*[Optional]*/ [
+                //if tracebox was called with -v :
+                    {
+                        "Name of the extension" : {
+                            "Info": "Information of the extension"
+                        }
+                    },
+                // else:
+                    "Name of the extension(s)"
+
+            ]
+        }
+    ]
+}
+```

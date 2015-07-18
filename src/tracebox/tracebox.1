@@ -1,5 +1,5 @@
 .\" ###### Setup ############################################################
-.Dd July 18, 2013
+.Dd March 18, 2015
 .Dt tracebox 1
 .Os tracebox
 .\" ###### Name #############################################################
@@ -10,7 +10,7 @@
 .Sh SYNOPSIS
 .Nm tracebox
 .Op OPTIONS
-host
+host [Lua arguments list ...]
 .\" ###### Description ######################################################
 .Sh DESCRIPTION
 .Nm tracebox
@@ -24,9 +24,16 @@ described in the standard. This is caused by operating systems configured to
 reply with full ICMP (e.g., Linux, Cisco IOS-XR, etc.) as well as the ICMP
 Multi-Part Messages extension that standardize the fact that routers using MPLS
 tunnels replies and ICMP message containing the full datagram.
+If however it receives an ICMP with only a partial probe in the payload, it will
+indicate it by appending a [PARTIAL] flag on the modification list.
+
 .Pp
 .\" ###### Arguments ########################################################
 .Sh ARGUMENTS
+Every argument passed after the options in conjunction with \-s or \-l will be passed
+to the lua interpreter and available in a global vector of strings named 'argv',
+in the order they appeared on the command-line.
+
 The following options may be provided:
 .Bl -tag -width indent
 .It \-h
@@ -45,9 +52,30 @@ Specify a network interface to operate with.
 Set the max number of hops (max TTL to be reached). Default is 30.
 .It \-p probe
 Specify the probe to send.
-.It \-s script
+.It \-l inline_script
 Run a script.
+.It \-s script
+Run a script file.
+.It \-v
+Print more information.
+.It \-w
+Show warnings when crafting packets.
+.It \-f filename
+Specify the name of the pcap file.
+.It \-j
+Change the output format to JSON.
+.It \-t timeout
+Timeout to wait for a reply after sending a packet. Accepts decimals, default is 1s.
 .El
+
+If Tracebox was compiled with curl support:
+.Bl -tag -width indent
+.It \-q
+Cancel automatic upload of the packet capture file.
+.It \-c server_url
+Specify a server where capture files of each session will be uploaded.
+.El
+
 .\" ###### Arguments ########################################################
 .Sh EXAMPLES
 .Bl -tag -width indent

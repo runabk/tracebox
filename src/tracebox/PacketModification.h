@@ -1,37 +1,31 @@
-/*
- *  Copyright (C) 2013  Gregory Detal <gregory.detal@uclouvain.be>
+/**
+ * Tracebox -- A middlebox detection tool
  *
- *  This program is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU General Public License
- *  as published by the Free Software Foundation; either version 2
- *  of the License, or (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301, USA.
+ *  Copyright 2013-2015 by its authors.
+ *  Some rights reserved. See LICENSE, AUTHORS.
  */
 
 #ifndef __PACKETMODIFICATION_H__
 #define __PACKETMODIFICATION_H__
 
 #include "crafter.h"
+#ifdef HAVE_LIBJSON
+#include <json/json.h>
+#endif
+#ifdef HAVE_JSONC
+#include <json-c/json.h>
+#endif
 
 using namespace Crafter;
 
 class Modification {
-	/* Representation of the modification */
-	std::string name;
-
 	/* Layer protocol where the modification occured. The protocol is as defined
 	 * in Libcrafter.
 	 */
 	int layer_proto;
+
+	/* Representation of the modification */
+	std::string name;
 
 	/* Offset compared to the start of the layer (in bits) */
 	size_t offset;
@@ -41,12 +35,12 @@ class Modification {
 
 	/* Some private functions */
 	std::string GetModifRepr() const;
+	json_object* GetModifRepr_JSON() const;
 
 protected:
 	/* Field values helper */
 	std::string field1_repr;
 	std::string field2_repr;
-
 
 public:
 	Modification(int proto, std::string name, size_t offset, size_t len);
@@ -69,32 +63,42 @@ public:
 		return name;
 	}
 
+	virtual ~Modification() {}
+
 	virtual void Print(std::ostream& out = std::cout, bool verbose = false) const;
+
+	virtual void Print_JSON(json_object *res = json_object_new_array(), json_object *add = json_object_new_array(), json_object *del = json_object_new_array(), bool verbose = false) const;
 };
 
-class Addition : public Modification {
-public:
+struct Addition : public Modification {
 	Addition(Layer *l);
 
 	virtual void Print(std::ostream& out, bool verbose = false) const;
+
+	virtual void Print_JSON(json_object *res = json_object_new_array(), json_object *add = json_object_new_array(), json_object *del = json_object_new_array(), bool verbose = false) const;
 };
 
-class Deletion : public Modification {
-public:
+struct Deletion : public Modification {
 	Deletion(Layer *l);
 
 	virtual void Print(std::ostream& out, bool verbose = false) const;
+
+	virtual void Print_JSON(json_object *res = json_object_new_array(), json_object *add = json_object_new_array(), json_object *del = json_object_new_array(), bool verbose = false) const;
 };
 
-class PacketModifications : public std::vector<Modification *> {
+struct PacketModifications : public std::vector<Modification *> {
 	Packet *orig;
 	Packet *modif;
+	bool partial;
 
-public:
-	PacketModifications(Packet *orig, Packet *modif) : orig(orig), modif(modif) { }
+	PacketModifications(Packet *orig, Packet *modif, bool partial=false) : orig(new Packet(*orig)), modif(modif), partial(partial) { }
 	~PacketModifications();
 
 	void Print(std::ostream& out = std::cout, bool verbose = false) const;
+
+	static PacketModifications* ComputeModifications(Crafter::Packet *pkt, Crafter::Packet **rcv);
+
+	void Print_JSON(json_object *res = json_object_new_array(), json_object *icmp = json_object_new_array(), json_object *add = json_object_new_array(), json_object *del = json_object_new_array(), bool verbose = false) const;
 };
 
 #endif

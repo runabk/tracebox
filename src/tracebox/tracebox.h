@@ -1,33 +1,34 @@
-/*
- *  Copyright (C) 2013  Gregory Detal <gregory.detal@uclouvain.be>
+/**
+ * Tracebox -- A middlebox detection tool
  *
- *  This program is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU General Public License
- *  as published by the Free Software Foundation; either version 2
- *  of the License, or (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301, USA.
+ *  Copyright 2013-2015 by its authors.
+ *  Some rights reserved. See LICENSE, AUTHORS.
  */
+
 
 #ifndef __TRACEBOX_H__
 #define __TRACEBOX_H__
 
 #include "crafter.h"
+#include "config.h"
 #include "PacketModification.h"
 
-using namespace Crafter;
+extern double tbx_default_timeout;
 
-typedef int (tracebox_cb_t)(void *, int, std::string&, const Packet * const, Packet *, PacketModifications *);
-	
+typedef int (tracebox_cb_t)(void *, int, std::string&,
+		const Crafter::Packet * const,
+		Crafter::Packet *, PacketModifications *);
 
-int doTracebox(Packet *pkt, tracebox_cb_t *callback, std::string& err, void *ctx = NULL);
+IPLayer* probe_sanity_check(Crafter::Packet *probe,
+		std::string& err, std::string& iface);
+
+int doTracebox(Crafter::Packet *pkt, tracebox_cb_t *callback,
+		std::string& err, void *ctx = NULL);
+
+void writePcap(Packet* p);
+
+#ifdef HAVE_CURL
+void curlPost(const char *pcap_filename, const char *url);
+#endif
 
 #endif
