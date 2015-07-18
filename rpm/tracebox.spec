@@ -1,5 +1,5 @@
 Name:           tracebox
-Version:        0.1~td3.0
+Version:        0.1~td4.1
 Release:        1%{?dist}
 Summary:        -
 
@@ -9,7 +9,7 @@ URL:            http://www.tracebox.org
 Source:         %{name}-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
-BuildRequires:  libpcap-devel, libdnet-devel, lua-devel, python-devel
+BuildRequires:  autoconf, automake, libtool, libpcap-devel, libdnet-devel, lua-devel, python-devel, git, fakeroot
 Requires:       libpcap, libdnet, lua, scapy, pcapy
 
 %description
@@ -18,14 +18,22 @@ Requires:       libpcap, libdnet, lua, scapy, pcapy
 %prep
 %setup -q
 
+
 %build
-%configure --disable-scripts
+rm -rf noinst/libcrafter
+rm -rf tests/tools/click
+git clone --depth=1 https://github.com/gdetal/libcrafter.git noinst/libcrafter
+git clone --depth=1 https://github.com/bhesmans/click.git tests/tools/click
+autoreconf -if
+
+
+%configure --enable-tests --disable-scripts --prefix=/usr
 make %{?_smp_mflags}
 
 
 %install
 rm -rf $RPM_BUILD_ROOT
-make install DESTDIR=$RPM_BUILD_ROOT
+make DESTDIR=$RPM_BUILD_ROOT install
 
 
 %clean
@@ -34,11 +42,10 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root,-)
-%doc
-%{_libdir}/*
-%{_docdir}/*
-%{_bindir}/*
-%exclude %{_includedir}/*
+%{_bindir}/luatracebox
+%{_bindir}/tracebox
+%{_datadir}/man/man1/tracebox.1.gz
+%{_datadir}/tracebox/*.tbx
 
 
 %changelog
