@@ -1,5 +1,6 @@
 #!/bin/bash
 
+./bootstrap && \
 ./clean-deb && \
-./make-deb precise quantal raring saucy trusty utopic && \
+./make-deb precise trusty utopic vivid wily && \
 dput ppa *.changes
