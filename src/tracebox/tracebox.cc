@@ -65,7 +65,7 @@ static json_object *j_results = NULL;
 double tbx_default_timeout = 1;
 
 template<int n> void BuildNetworkLayer(Packet *) { }
-template<int n> void BuildTransportLayer(Packet *, int) { }
+template<int n> void BuildTransportLayer(Packet *, int,int, const char *) { }
 
 template<>
 void BuildNetworkLayer<IP::PROTO>(Packet *pkt)
@@ -84,10 +84,10 @@ void BuildNetworkLayer<IPv6::PROTO>(Packet *pkt)
 }
 
 template<>
-void BuildTransportLayer<TCP::PROTO>(Packet *pkt, int dport)
+void BuildTransportLayer<TCP::PROTO>(Packet *pkt, int dport, int sport,const char *in_str)
 {
 	TCP tcp = TCP();
-	tcp.SetSrcPort(rand());
+	tcp.SetSrcPort(sport);
 	tcp.SetDstPort(dport);
 	tcp.SetSeqNumber(rand());
 	tcp.SetFlags(0x2);
@@ -98,12 +98,107 @@ template<>
 void BuildTransportLayer<UDP::PROTO>(Packet *pkt, int dport)
 {
 	UDP udp = UDP();
-	udp.SetSrcPort(rand());
+	udp.SetSrcPort(sport);
 	udp.SetDstPort(dport);
 	pkt->PushLayer(udp);
+	if(in_str)
+        {
+                int len_str = strlen(in_str) / 2;
+                byte payload[len_str];
+                for (int i = 0; i < len_str; i++)
+                  sscanf(in_str + 2*i, "%02x",&payload[i]);
+                pkt->PushLayer(RawLayer(payload,len_str));
+        }
+        else
+        {       byte payload[] ={0x50,0x49,0x4e,0x47};
+                pkt->PushLayer(RawLayer(payload,4));
+        }
 }
 
-Packet *BuildProbe(int net, int tr, int dport)
+template<>
+void BuildTransportLayer<SCTP::PROTO>(Packet *pkt, int dport,int sport,const char *in_str)
+{
+        SCTP sctp = SCTP();
+        sctp.SetSrcPort(sport);
+        sctp.SetDstPort(dport);
+        sctp.SetTag(0);
+        pkt->PushLayer(sctp);
+
+        if(in_str)
+        {
+                int len_str = strlen(in_str) / 2;
+                byte payload[len_str];
+                for (int i = 0; i < len_str; i++)
+                  sscanf(in_str + 2*i, "%02x", &payload[i]);
+                pkt->PushLayer(RawLayer(payload,len_str));
+        }
+        else
+        {
+                byte payload[] ={0x01,0x00,0x00,0x14,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+                pkt->PushLayer(RawLayer(payload,20));
+        }
+}
+
+template<>
+void BuildTransportLayer<DCCP::PROTO>(Packet *pkt, int dport,int sport,const char *in_str)
+{
+        DCCP dccp = DCCP();
+        dccp.SetSrcPort(sport);
+        dccp.SetDstPort(dport);
+        dccp.SetSeqNumberH(rand());
+        dccp.SetSeqNumberL(rand());
+        //pkt->Print();
+        pkt->PushLayer(dccp);
+}
+
+template<>
+void BuildTransportLayer<UDPLite::PROTO>(Packet *pkt, int dport,int sport,const char *in_str)
+{
+        UDPLite udplite = UDPLite();
+        udplite.SetSrcPort(sport);
+        udplite.SetDstPort(dport);
+        pkt->PushLayer(udplite);
+
+        if(in_str)
+        {
+                int len_str = strlen(in_str) / 2;
+                byte payload[len_str];
+                for (int i = 0; i < len_str; i++)
+                  sscanf(in_str + 2*i, "%02x", &payload[i]);
+                pkt->PushLayer(RawLayer(payload,len_str));
+        }
+        else
+        {       byte payload[] ={0x50,0x49,0x4e,0x47};
+                pkt->PushLayer(RawLayer(payload,4));
+        }
+
+}
+
+template<>
+void BuildTransportLayer<IPSec::PROTO>(Packet *pkt, int dport,int sport,const char *in_str)
+{
+        IPSec ipsec = IPSec();
+        ipsec.SetSpi(sport);
+        ipsec.SetSeq(dport);
+        pkt->PushLayer(ipsec);
+
+        if(in_str)
+        {
+                int len_str = strlen(in_str) / 2;
+                byte payload[len_str];
+                for (int i = 0; i < len_str; i++)
+                  sscanf(in_str + 2*i, "%02x", &payload[i]);
+                pkt->PushLayer(RawLayer(payload,len_str));
+        }
+        else
+       {
+
+        byte payload[] ={0x00, 0x00, 0x03, 0xe8, 0x00, 0x00, 0x00, 0x1a, 0x17, 0x0e, 0x16, 0xad, 0x78, 0xe0, 0xee, 0xc6, 0x52, 0x1a, 0x1c, 0xa0, 0x1c, 0x2f, 0x49, 0x08, 0xfb, 0xfd, 0x3f, 0xa3, 0xae, 0x1b, 0xfa, 0xbf, 0x4a, 0xe9, 0x4a, 0x56, 0x2a, 0x78, 0xc3, 0x65, 0xdd, 0xf7, 0x2f, 0xce, 0x9d, 0xd0, 0x06, 0x6c, 0xbf, 0xac, 0xe9, 0xa9, 0x63, 0x53, 0x5a, 0xde, 0xc1, 0x76, 0xf5, 0x77, 0xc1, 0x8a, 0xd9, 0x00, 0xda, 0xbc, 0x8e, 0xfc, 0x6a, 0x95, 0xde, 0x54, 0x13, 0x39, 0xde, 0xa0, 0x3d, 0x7a, 0x1d, 0xca, 0x5f, 0x51, 0x76, 0xfc, 0x0c, 0xed, 0xf5, 0x5f, 0x86, 0xfa, 0x96, 0x76, 0xca, 0xf4, 0xe0, 0x32, 0x69, 0x2d, 0x91, 0x42, 0x08, 0x68, 0x85, 0x04, 0x5e, 0x6a, 0x73, 0x47, 0x5f, 0x9f, 0xd8, 0xe9, 0xb9, 0x53, 0xaf, 0xa7, 0x9c, 0x17, 0x1d, 0x6b, 0x88, 0xd8, 0x4a, 0x7b, 0x51, 0x72, 0x56, 0x0c, 0x57, 0xcf, 0xea, 0x87};
+        pkt->PushLayer(RawLayer(payload,132));
+        }
+}
+
+Packet *BuildProbe(int net, int tr, int dport, int sport,const char *in_str)
 {
 	Packet *pkt = new Packet();
 	switch(net) {
@@ -115,12 +210,24 @@ Packet *BuildProbe(int net, int tr, int dport)
 		break;
 	}
 	switch(tr) {
+	case IPSec::PROTO:
+                BuildTransportLayer<IPSec::PROTO>(pkt, dport,sport,in_str);
+                break;
 	case TCP::PROTO:
-		BuildTransportLayer<TCP::PROTO>(pkt, dport);
+		BuildTransportLayer<TCP::PROTO>(pkt, dport,sport,in_str);
 		break;
 	case UDP::PROTO:
-		BuildTransportLayer<UDP::PROTO>(pkt, dport);
+		BuildTransportLayer<UDP::PROTO>(pkt, dport,sport,in_str);
 		break;
+	case SCTP::PROTO:
+                BuildTransportLayer<SCTP::PROTO>(pkt, dport,sport,in_str);
+                break;
+        case DCCP::PROTO:
+                BuildTransportLayer<DCCP::PROTO>(pkt, dport,sport,in_str);
+                break;
+        case UDPLite::PROTO:
+                BuildTransportLayer<UDPLite::PROTO>(pkt, dport,sport,in_str);
+                break;
 	}
 	return pkt;
 }
@@ -361,7 +468,7 @@ static unsigned long timeval_diff(const struct timeval a, const struct timeval b
 }
 
 static int Callback(void *ctx, uint8_t ttl, string& router,
-		PacketModifications *mod)
+		PacketModifications *mod,Packet *r_pkt)
 {
 	(void)ctx;
 	const Packet *probe = mod->orig.get();
@@ -379,20 +486,41 @@ static int Callback(void *ctx, uint8_t ttl, string& router,
 			cout << +(int)ttl << ": " << router << " ";
 		else
 			cout << (int)ttl << ": " << GetHostname(router) << " (" << router << ") ";
+		IPLayer *ip_l = r_pkt->GetLayer<IPLayer>();
+
+                switch (ip_l->GetID()) {
+                case IP::PROTO:
+
+                        IP *r_ip = reinterpret_cast<IP *>(ip_l);
+                        if ( (int)r_ip->GetProtocol() == 1)
+                        {
+                                ICMP *icmp = r_pkt->GetLayer<ICMP>();
+                                cout << (int)icmp->GetType() << " " << (int)icmp->GetCode() << " ";
+                        }
+                        break;
+                /*case IPv6::PROTO:
+                        IPv6 *r_ip = reinterpret_cast<IPv6 *>(ip_l);
+                        if ( (int)r_ip->GetNextHeader() == 58)
+                        {
+                                ICMPv6 *icmp = r_pkt->GetLayer<ICMPv6>();
+                                cout << (int)icmp->GetType() << " " << icmp->GetCode() << " ";
+
+                        }
+                        break;*/
+                }
 		cout << timeval_diff(rcv->GetTimestamp(), probe->GetTimestamp()) / 1000 << "ms ";
 		if (mod) {
 			mod->Print(cout, verbose);
 			delete mod;
 		}
 		cout << endl;
-	} else
-		cout << (int)ttl << ": *" << endl;
+	} 
 
 	return 0;
 }
 
 static int Callback_JSON(void *ctx, uint8_t ttl, string& router,
-		PacketModifications *mod)
+		PacketModifications *mod,Packet *r_pkt)
 {
 	(void)ctx;
 	const Packet *probe = mod->orig.get();
@@ -409,7 +537,41 @@ static int Callback_JSON(void *ctx, uint8_t ttl, string& router,
 	const Packet *rcv = mod->modif.get();
 	if (rcv) {
 			ip = rcv->GetLayer<IPLayer>();
+			IPLayer *ip_l = r_pkt->GetLayer<IPLayer>();
 
+                        switch (ip_l->GetID()) {
+                        case IP::PROTO:
+                                IP *r_ip = reinterpret_cast<IP *>(ip_l);
+                                if ( (int)r_ip->GetProtocol() == 1)
+                                {
+                                        ICMP *icmp = r_pkt->GetLayer<ICMP>();
+                                        json_object_object_add(hop,"icmp_type", json_object_new_int(icmp->GetType()));
+                                        json_object_object_add(hop,"icmp_code", json_object_new_int(icmp->GetCode()));
+                                }
+                                break;
+                        /*case IPv6::PROTO:
+                                IPv6 *r_ip = GetIPv6(*r_pkt);
+                                //IPv6 *r_ip = reinterpret_cast<IPv6 *>(ip_l);
+                                if ( (int)r_ip->GetNextHeader() == 58)
+                                {
+                                        ICMPv6 *icmp = r_pkt->GetLayer<ICMPv6>();
+                                        json_object_object_add(hop,"icmp_type", json_object_new_int(icmp->GetType()));
+                                        json_object_object_add(hop,"icmp_code", json_object_new_int(icmp->GetCode()));
+                                }
+                                break;*/
+                                }
+
+                        /*
+                        IPLayer *ip_l = r_pkt->GetLayer<IPLayer>();
+                        IP *r_ip = reinterpret_cast<IP *>(ip_l);
+                        if ( (int)r_ip->GetProtocol() == 1)
+                        {
+                                ICMP *icmp = r_pkt->GetLayer<ICMP>();
+                                json_object_object_add(hop,"icmp_type", json_object_new_int(icmp->GetType()));
+                                json_object_object_add(hop,"icmp_code", json_object_new_int(icmp->GetCode()));
+                        
+                        }
+                        */
 
 			json_object_object_add(hop,"hop", json_object_new_int(ttl));
 			json_object_object_add(hop,"from", json_object_new_string(router.c_str()));
@@ -504,6 +666,7 @@ int doTracebox(std::shared_ptr<Packet> pkt_shrd, tracebox_cb_t *callback,
 	Packet* rcv = NULL;
 	PacketModifications *mod = NULL;
 	string sIP;
+	Packet new_pkt=Packet();
 	Packet *pkt = pkt_shrd.get();
 	IPLayer *ip = probe_sanity_check(pkt, err, iface);
 	if (!ip)
@@ -552,7 +715,7 @@ int doTracebox(std::shared_ptr<Packet> pkt_shrd, tracebox_cb_t *callback,
 		mod = PacketModifications::ComputeModifications(pkt_shrd, rcv);
 
 		/* The callback can stop the iteration */
-		if (callback && callback(ctx, ttl, sIP, mod))
+		if (callback && callback(ctx, ttl, sIP, mod,&new_pkt))
 			return 0;
 
 		/* Stop if we reached the server */
@@ -580,9 +743,11 @@ int main(int argc, char *argv[])
 	int c;
 	int ret = EXIT_SUCCESS;
 	int dport = 80;
+	int sport = 48001;
 	int net_proto = IP::PROTO, tr_proto = TCP::PROTO;
 	const char *script = NULL;
 	const char *probe = NULL;
+	const char *extra_payload = NULL;
 	Packet *pkt = NULL;
 	string err;
 	bool inline_script = false;
@@ -592,12 +757,15 @@ int main(int argc, char *argv[])
 
 	/* disable libcrafter warnings */
 	ShowWarnings = 0;
-	while ((c = getopt(argc, argv, "Sl:i:M:m:s:p:d:f:hnv6uwjt:VD"
+	while ((c = getopt(argc, argv, "e:Sl:i:M:m:s:p:d:x:f:hnv6uwjabqyt:VD"
 #ifdef HAVE_CURL
 					"Cc:"
 #endif
 					)) != -1) {
 		switch (c) {
+			case 'e':
+                                extra_payload = strdup(optarg);
+                                break;
 			case 'S':
 				skip_suid_check = true;
 				break;
@@ -619,9 +787,24 @@ int main(int argc, char *argv[])
 			case 'd':
 				dport = strtol(optarg, NULL, 10);
 				break;
+			case 'x':
+                                sport = strtol(optarg, NULL, 10);
+                                break;
 			case 'u':
 				tr_proto = UDP::PROTO;
 				break;
+			case 'q':
+                                tr_proto = IPSec::PROTO;;
+                                break;
+			case 'a':
+                                tr_proto = SCTP::PROTO;
+                                break;
+                        case 'b':
+                                tr_proto = DCCP::PROTO;
+                                break;
+                        case 'y':
+                                tr_proto = UDPLite::PROTO;
+                                break;
 			case 's':
 				script = optarg;
 				break;
@@ -702,7 +885,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (!probe && !script) {
-		pkt = BuildProbe(net_proto, tr_proto, dport);
+		pkt = BuildProbe(net_proto, tr_proto, dport,sport,extra_payload);
 	} else if (probe && !script) {
 		string cmd = probe;
 		pkt = script_packet(cmd);
@@ -758,6 +941,12 @@ usage:
 "  -s script_file              Run a script file.\n"
 "  -l inline_script            Run a script.\n"
 "  -w                          Show warnings when crafting packets.\n"
+"  -x sport                    Use the specified port for sport\n"
+"  -e                          Extra payload (input=hexstring, eg -e 011011ef). Payload just after SCTP header,UDP, UDPLite, or IP (for IPSec)\n"
+"  -a                          Use SCTP INIT for static probe generated\n"
+"  -b                          Use DCCP Request for static probe generated\n"
+"  -y                          Use UDPLite for static probe generated\n"
+"  -q                          Use IPSec for static probe generated\n"
 #ifdef HAVE_LIBCURL
 "  -c server_url               Specify a server where captured packets will be sent.\n"
 "  -C                          Same than -c, but use the server at " DEFAULT_URL ".\n"
