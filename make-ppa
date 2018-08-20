@@ -2,5 +2,5 @@
 
 ./bootstrap.sh && \
 ./clean-deb && \
-./make-deb precise trusty utopic vivid wily && \
+./make-deb trusty xenial bionic cosmic && \
 dput ppa *.changes
