@@ -18,7 +18,7 @@
 extern double tbx_default_timeout;
 extern bool print_debug;
 
-typedef int (tracebox_cb_t)(void *, uint8_t, std::string&, PacketModifications *);
+typedef int (tracebox_cb_t)(void *, uint8_t, std::string&, PacketModifications *,Packet *);
 
 IPLayer* probe_sanity_check(const Crafter::Packet *probe,
 		std::string& err, std::string& iface);
