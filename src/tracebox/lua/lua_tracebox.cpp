@@ -50,7 +50,7 @@ struct tracebox_info {
  * end
  * */
 static int tCallback(void *ctx, uint8_t ttl, std::string& ip,
-		PacketModifications *mod)
+		PacketModifications *mod,Packet *r_pkt)
 {
 	struct tracebox_info *info = (struct tracebox_info *)ctx;
 	int ret;
