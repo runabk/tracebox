@@ -2,30 +2,13 @@ Source: tracebox
 Section: net
 Priority: extra
 Maintainer: Olivier Tilmans <olivier.tilmans@uclouvain.be>
-Build-Depends: autoconf,
-               autotools-dev,
-               debhelper (>= 8.0.0),
-               gcc (>= 4.8),
-               git,
-               libcurl4-gnutls-dev,
-               libjson0-dev,
-               liblua5.1-dev,
-               libnetfilter-queue-dev,
-               libpcap-dev,
-               lua-ldoc,
-               luarocks
-Standards-Version: 0.3
+Build-Depends: gcc (>= 6.3.0), debhelper (>= 10.2.5), autotools-dev, autoconf, libpcap-dev, liblua5.2-dev, git, libnetfilter-queue-dev, libjson-c-dev, libcurl4-gnutls-dev, luarocks, lua-sec
+Standards-Version: 0.4.4
 Homepage: http://www.tracebox.org
 
 Package: tracebox
 Architecture: any
-Depends: libcurl4-gnutls-dev,
-         libjson0,
-         liblua5.1-0,
-         libnetfilter-queue1,
-         libpcap0.8,
-         ${misc:Depends},
-         ${shlibs:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, liblua5.2-0, libpcap0.8, libnetfilter-queue1, libjson-c3, libcurl4-gnutls-dev
 Recommends: iputils-ping,
             iputils-tracepath,
             netperfmeter,

@@ -27,7 +27,7 @@ Packet *script_packet(std::string& cmd)
 
 	lua_getglobal(l, "pkt");
 	/* As we'll clean the lua state, copy the produced packet */
-	Packet *pkt = new Packet(*l_packet_ref::get(l, -1));
+	Packet *pkt = new Packet(*l_packet_ref::extract(l, -1));
 	if (!pkt)
 		return NULL;
 
@@ -67,14 +67,16 @@ int script_execfile(const char *filename, int argc, char **argv)
 	_add_argv(l, argc, argv);
 	lua_pushcfunction(l, lua_traceback);
 	int err_handler = lua_gettop(l);
-	if ((ret = luaL_loadfile(l, filename)))
-		perror("script_execfile");
-	else
+	if ((ret = luaL_loadfile(l, filename))) {
+		std::cerr << "Failed to exec " << filename << ":" << std::endl;
+		std::cerr << luaL_checkstring(l, -1) << std::endl;
+	} else {
 		if ((ret = lua_pcall(l, 0, LUA_MULTRET, err_handler))) {
 			std::cerr << "Lua error: " << luaL_checkstring(l, -1) << std::endl;
 		} else {
 			ret = lua_tointeger(l, -1);
 		}
+	}
 	lua_close(l);
 	return ret;
 }

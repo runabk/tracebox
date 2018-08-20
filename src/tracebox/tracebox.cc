@@ -5,10 +5,12 @@
  *  Some rights reserved. See LICENSE, AUTHORS.
  */
 
+#include "config.h"
 #include "tracebox.h"
 #include "crafter/Utils/IPResolver.h"
 #include "script.h"
 #include "PacketModification.h"
+#include "PartialHeader.h"
 
 
 #include <cstdlib>
@@ -47,11 +49,16 @@ extern "C" {
 using namespace Crafter;
 using namespace std;
 
-static int hops_max = 64;
+static bool skip_suid_check = false;
+
+static uint8_t hops_max = 64;
+static uint8_t hops_min = 1;
+
 static string destination;
 static string iface;
 static bool resolve = true;
 static bool verbose = false;
+bool print_debug = false;
 static json_object * jobj = NULL;
 static json_object *j_results = NULL;
 
@@ -64,16 +71,16 @@ template<>
 void BuildNetworkLayer<IP::PROTO>(Packet *pkt)
 {
 	IP ip = IP();
-#ifdef __APPLE__
 	ip.SetIdentification(rand());
-#endif
 	pkt->PushLayer(ip);
 }
 
 template<>
 void BuildNetworkLayer<IPv6::PROTO>(Packet *pkt)
 {
-	pkt->PushLayer(IPv6());
+	IPv6 ip = IPv6();
+	ip.SetFlowLabel(rand());
+	pkt->PushLayer(ip);
 }
 
 template<>
@@ -216,7 +223,7 @@ static pcap_dumper_t *pdumper, *save_dumper = NULL;
 static const char *pcap_filename = DEFAULT_PCAP_FILENAME;
 #ifdef HAVE_CURL
 static const char * upload_url = DEFAULT_URL;
-static bool upload = true;
+static bool upload = false;
 #endif
 
 int openPcap(){
@@ -229,11 +236,11 @@ int openPcap(){
 }
 
 void writePcap(Packet* p){
-	struct pcap_pkthdr *hdr= (pcap_pkthdr *) malloc(sizeof(*hdr));
-	hdr->len = p->GetSize();
-	hdr->caplen = p->GetSize();
-	gettimeofday(&hdr->ts, NULL);
-	pcap_dump(reinterpret_cast<u_char*>(save_dumper), hdr, p->GetRawPtr());
+	struct pcap_pkthdr hdr;
+	hdr.len = p->GetSize();
+	hdr.caplen = p->GetSize();
+	hdr.ts = p->GetTimestamp();
+	pcap_dump(reinterpret_cast<u_char*>(save_dumper), &hdr, p->GetRawPtr());
 }
 
 void closePcap(){
@@ -241,8 +248,10 @@ void closePcap(){
 	pcap_close(save_d);
 	pcap_dump_close(save_dumper);
 #ifdef HAVE_CURL
-	if (upload)
+	if (upload) {
+		std::cerr << "Uploading pcap to " << upload_url << std::endl;
 		curlPost(pcap_filename, upload_url);
+	}
 #endif
 }
 
@@ -346,38 +355,47 @@ string iface_address(int proto, string& iface)
 	} catch (std::runtime_error &ex) { return ""; }
 }
 
+static unsigned long timeval_diff(const struct timeval a, const struct timeval b)
+{
+	return (a.tv_sec - b.tv_sec) * 10e6L + a.tv_usec - b.tv_usec;
+}
 
-static int Callback(void *ctx, int ttl, string& router,
-	const Packet * const probe, Packet *rcv, PacketModifications *mod)
+static int Callback(void *ctx, uint8_t ttl, string& router,
+		PacketModifications *mod)
 {
 	(void)ctx;
+	const Packet *probe = mod->orig.get();
+	const Packet *rcv = mod->modif.get();
 	IPLayer *ip = probe->GetLayer<IPLayer>();
 
 	if (ttl == 1)
-		cout << "tracebox to " << ip->GetDestinationIP() << " (" << destination << "): " << hops_max << " hops max" << endl;
+		cout << "tracebox to " <<
+			ip->GetDestinationIP() << " (" << destination << "): " <<
+			(int)hops_max << " hops max" << endl;
 
 	if (rcv) {
 		ip = rcv->GetLayer<IPLayer>();
 		if (!resolve)
-			cout << ttl << ": " << router << " ";
+			cout << +(int)ttl << ": " << router << " ";
 		else
-			cout << ttl << ": " << GetHostname(router) << " (" << router << ") ";
+			cout << (int)ttl << ": " << GetHostname(router) << " (" << router << ") ";
+		cout << timeval_diff(rcv->GetTimestamp(), probe->GetTimestamp()) / 1000 << "ms ";
 		if (mod) {
 			mod->Print(cout, verbose);
 			delete mod;
 		}
 		cout << endl;
-		delete rcv;
 	} else
-		cout << ttl << ": *" << endl;
+		cout << (int)ttl << ": *" << endl;
 
 	return 0;
 }
 
-static int Callback_JSON(void *ctx, int ttl, string& router,
-		const Packet * const probe, Packet *rcv, PacketModifications *mod)
+static int Callback_JSON(void *ctx, uint8_t ttl, string& router,
+		PacketModifications *mod)
 {
 	(void)ctx;
+	const Packet *probe = mod->orig.get();
 	IPLayer *ip = probe->GetLayer<IPLayer>();
 
 	if (ttl == 1){
@@ -388,28 +406,31 @@ static int Callback_JSON(void *ctx, int ttl, string& router,
 
 	json_object * hop = json_object_new_object();
 
+	const Packet *rcv = mod->modif.get();
 	if (rcv) {
 			ip = rcv->GetLayer<IPLayer>();
 
 
 			json_object_object_add(hop,"hop", json_object_new_int(ttl));
 			json_object_object_add(hop,"from", json_object_new_string(router.c_str()));
+			json_object_object_add(hop,"delay", json_object_new_int(timeval_diff(rcv->GetTimestamp(), probe->GetTimestamp())));
 			if (resolve)
 				json_object_object_add(hop,"name", json_object_new_string(GetHostname(router).c_str()));
 			if (mod){
 				json_object *modif = json_object_new_array();
-				json_object *icmp = json_object_new_array();
 				json_object *add = json_object_new_array();
 				json_object *del = json_object_new_array();
+				json_object *ext = NULL;
 
-				mod->Print_JSON(modif, icmp, add, del, verbose);
+				mod->Print_JSON(modif, add, del, &ext, verbose);
 
 				json_object_object_add(hop,"Modifications", modif);
-				json_object_object_add(hop,"Aditions", add);
+				json_object_object_add(hop,"Additions", add);
 				json_object_object_add(hop,"Deletions", del);
+				if (ext != NULL)
+					json_object_object_add(hop, "ICMPExtensions", ext);
 				delete mod;
 			}
-		delete rcv;
 	}
 	else{
 		json_object_object_add(hop,"hop", json_object_new_int(ttl));
@@ -429,7 +450,7 @@ bool validIPAddress(bool ipv6, const string& ipAddress)
 		return validateIpv4Address(ipAddress);
 }
 
-IPLayer* probe_sanity_check(Packet *pkt, string& err, string& iface)
+IPLayer* probe_sanity_check(const Packet *pkt, string& err, string& iface)
 {
 	IPLayer *ip = pkt->GetLayer<IPLayer>();
 	string sourceIP;
@@ -477,17 +498,18 @@ IPLayer* probe_sanity_check(Packet *pkt, string& err, string& iface)
 	return ip;
 }
 
-int doTracebox(Packet *pkt, tracebox_cb_t *callback, string& err, void *ctx)
+int doTracebox(std::shared_ptr<Packet> pkt_shrd, tracebox_cb_t *callback,
+		string& err, void *ctx)
 {
+	Packet* rcv = NULL;
+	PacketModifications *mod = NULL;
+	string sIP;
+	Packet *pkt = pkt_shrd.get();
 	IPLayer *ip = probe_sanity_check(pkt, err, iface);
 	if (!ip)
 		return -1;
 
-	for (int ttl = 1; ttl <= hops_max; ++ttl) {
-		Packet* rcv = NULL;
-		PacketModifications *mod = NULL;
-		string sIP;
-
+	for (uint8_t ttl = hops_min; ttl <= hops_max; ++ttl) {
 		switch (ip->GetID()) {
 		case IP::PROTO:
 			reinterpret_cast<IP *>(ip)->SetTTL(ttl);
@@ -495,8 +517,17 @@ int doTracebox(Packet *pkt, tracebox_cb_t *callback, string& err, void *ctx)
 		case IPv6::PROTO:
 			reinterpret_cast<IPv6 *>(ip)->SetHopLimit(ttl);
 			break;
+		default:
+			std::cerr << "Could not access the IPLayer from the probe, "
+				"aborting." << std::endl;
+			return 1;
 		}
 		pkt->PreCraft();
+		if (print_debug) {
+			std::cerr << "Filter used at hop " << (int) ttl << ": ";
+			pkt->GetFilter(std::cerr);
+			std::cerr << std::endl;
+		}
 
 		if (isPcap(iface))
 			rcv = PcapSendRecv(pkt, iface);
@@ -515,11 +546,13 @@ int doTracebox(Packet *pkt, tracebox_cb_t *callback, string& err, void *ctx)
 				writePcap(&p);
 			}
 			sIP = rcv->GetLayer<IPLayer>()->GetSourceIP();
-			mod = PacketModifications::ComputeModifications(pkt, &rcv);
+		} else {
+			sIP = "";
 		}
+		mod = PacketModifications::ComputeModifications(pkt_shrd, rcv);
 
 		/* The callback can stop the iteration */
-		if (callback && callback(ctx, ttl, sIP, pkt, rcv, mod))
+		if (callback && callback(ctx, ttl, sIP, mod))
 			return 0;
 
 		/* Stop if we reached the server */
@@ -528,6 +561,19 @@ int doTracebox(Packet *pkt, tracebox_cb_t *callback, string& err, void *ctx)
 	}
 	return 0;
 }
+
+int set_tracebox_ttl_range(uint8_t ttl_min, uint8_t ttl_max)
+{
+	if(!(ttl_min > 0 && (ttl_min <= ttl_max)))
+		return -1;
+
+	hops_min = ttl_min;
+	hops_max = ttl_max;
+	return 0;
+}
+
+uint8_t get_min_ttl() { return hops_min; };
+uint8_t get_max_ttl() { return hops_max; };
 
 int main(int argc, char *argv[])
 {
@@ -540,19 +586,26 @@ int main(int argc, char *argv[])
 	Packet *pkt = NULL;
 	string err;
 	bool inline_script = false;
+	PartialTCP::register_type();
 
 	tracebox_cb_t *callback = Callback;
 
 	/* disable libcrafter warnings */
 	ShowWarnings = 0;
-	while ((c = getopt(argc, argv, "l:i:m:s:p:d:f:hnv6uwjt:"
+	while ((c = getopt(argc, argv, "Sl:i:M:m:s:p:d:f:hnv6uwjt:VD"
 #ifdef HAVE_CURL
-					"qc:"
+					"Cc:"
 #endif
 					)) != -1) {
 		switch (c) {
+			case 'S':
+				skip_suid_check = true;
+				break;
 			case 'i':
 				iface = optarg;
+				break;
+			case 'M':
+				hops_min = strtol(optarg, NULL, 10);
 				break;
 			case 'm':
 				hops_max = strtol(optarg, NULL, 10);
@@ -584,11 +637,12 @@ int main(int argc, char *argv[])
 				j_results = json_object_new_array();
 				break;
 #ifdef HAVE_CURL
-			case 'q' :
-				upload = false;
-				break;
 			case 'c':
 				upload_url = optarg;
+				upload = true;
+				break;
+			case 'C':
+				upload = true;
 				break;
 #endif
 			case 'f' :
@@ -607,23 +661,40 @@ int main(int argc, char *argv[])
 			case 't':
 				tbx_default_timeout = strtod(optarg, NULL);
 				break;
+			case 'V':
+				std::cerr << _REV_PARSE << std::endl;
+				return 0;
+			case 'D':
+				print_debug = true;
+				break;
+			case ':':
+				std::cerr << "Option `-" << (char)optopt
+							<< "' requires an argument!" << std::endl;
+				goto usage;
+				break;
 			case '?':
-				std::cerr << "Unknown option `-" << optopt << "'." << std::endl;
+				std::cerr << "Unknown option `-" << (char)optopt
+							<< "'." << std::endl;
 			default:
 				goto usage;
 		}
 	}
 
-	if (getuid() != 0) {
+    if (set_tracebox_ttl_range(hops_min, hops_max) < 0) {
+		cerr << "Cannot use the specified TTL range: [" << hops_min << ", " << hops_max << "]" << std::endl;
+		goto usage;
+	}
+
+	if (!skip_suid_check && getuid() != 0) {
 		cerr << "tracebox requires superuser permissions!" << endl;
-		return 1;
+		goto usage;
 	}
 
 	if (optind < argc) {
 		destination = argv[optind];
 	} else if (!inline_script && ! script) {
 		cerr << "You must specify a destination host" << endl;
-		return 1;
+		goto usage;
 	}
 
 	if(openPcap()){
@@ -651,16 +722,14 @@ int main(int argc, char *argv[])
 	if (!pkt)
 		return EXIT_FAILURE;
 
-	if (doTracebox(pkt, callback, err) < 0) {
+	if (doTracebox(std::shared_ptr<Packet>(pkt), callback, err) < 0) {
 		cerr << "Error: " << err << endl;
 		goto usage;
 	}
 
-	delete pkt;
-
 	if (jobj != NULL) {
 		json_object_object_add(jobj,"Hops", j_results);
-		printf ("%s\n",json_object_to_json_string(jobj));
+		std::cout << json_object_to_json_string(jobj) << std::endl;
 	}
 out:
 	closePcap();
@@ -679,6 +748,8 @@ usage:
 "  -i device                   Specify a network interface to operate with\n"
 "  -m hops_max                 Set the max number of hops (max TTL to be reached).\n"
 "                              Default is 30.\n"
+"  -M hops_min                 Set the min number of hops (min TTL to be reached).\n"
+"                              Default is 1. \n"
 "  -v                          Print more information.\n"
 "  -j                          Change the format of the output to JSON.\n"
 "  -t timeout                  Timeout to wait for a reply after sending a packet.\n"
@@ -688,16 +759,22 @@ usage:
 "  -l inline_script            Run a script.\n"
 "  -w                          Show warnings when crafting packets.\n"
 #ifdef HAVE_LIBCURL
-"  -q                          Cancel automatic upload of the capture file.\n"
 "  -c server_url               Specify a server where captured packets will be sent.\n"
-"                              Default is " DEFAULT_URL ".\n"
+"  -C                          Same than -c, but use the server at " DEFAULT_URL ".\n"
 #endif
 "  -f filename                 Specify the name of the pcap file.\n"
 "                              Default is " DEFAULT_PCAP_FILENAME ".\n"
+"  -S                          Skip the privilege check at the start.\n"
+"                              To be used mainly for testing purposes,\n"
+"	                           as it will cause tracebox to crash for some\n"
+"							   of its features!.\n"
+"  -V                          Print tracebox version and exit.\n"
+"  -D                          Print debug information.\n"
 "\n"
 "Every argument passed after the options in conjunction with -s or -l will be passed\n"
 "to the lua interpreter and available in a global vector of strings named 'argv',\n"
 "in the order they appeared on the command-line.\n"
+"\n\nVersion: " _REV_PARSE "\n"
 	<< endl;
 	return ret;
 }

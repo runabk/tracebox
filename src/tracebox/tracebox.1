@@ -50,6 +50,8 @@ Use the specified port for static probe generated. Default is 80.
 Specify a network interface to operate with.
 .It \-m hops_max
 Set the max number of hops (max TTL to be reached). Default is 30.
+.It \-M hops_min
+Set the min number of hops (min TTL to be reached). Default is 1.
 .It \-p probe
 Specify the probe to send.
 .It \-l inline_script
@@ -66,14 +68,18 @@ Specify the name of the pcap file.
 Change the output format to JSON.
 .It \-t timeout
 Timeout to wait for a reply after sending a packet. Accepts decimals, default is 1s.
+.It \-S
+Skip the privilege check at the start.
+To be used mainly for testing purposes, as it will cause tracebox to crash
+for some of its features!.
 .El
 
 If Tracebox was compiled with curl support:
 .Bl -tag -width indent
-.It \-q
-Cancel automatic upload of the packet capture file.
 .It \-c server_url
 Specify a server where capture files of each session will be uploaded.
+.It \-C
+Same than \-c, but use the default server
 .El
 
 .\" ###### Arguments ########################################################

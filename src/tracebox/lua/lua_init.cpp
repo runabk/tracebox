@@ -18,6 +18,7 @@
 #include "lua_ipv6segmentroutingheader.h"
 #include "lua_packet.hpp"
 #include "lua_packetmodifications.h"
+#include "lua_partialtcp.h"
 #include "lua_raw.h"
 #include "lua_tcp.h"
 #include "lua_tcpoption.hpp"
@@ -34,7 +35,7 @@
  * 1. Create & fill associated metatable
  * 2 Register globals functions/values for that type
  */
-#define INIT_TYPE(ref_t, t, l) \
+#define _INIT_TYPE_START(ref_t, t, l) \
 	do { \
 	const char *n = TNAME(t); \
 	luaL_newmetatable(l, n); \
@@ -42,8 +43,19 @@
 	lua_pushvalue(l, -1); \
 	lua_setfield(l, -1, "__index"); \
 	lua_setglobal(l,  n); \
-	ref_t::register_globals(l); } \
-	while(0)
+	ref_t::register_globals(l);
+
+#define _INIT_TYPE_END } while(0)
+
+#define INIT_TYPE(ref_t, t, l) \
+	_INIT_TYPE_START(ref_t, t, l) \
+	_INIT_TYPE_END
+
+#define INIT_LAYER(ref_t, t, l) \
+	_INIT_TYPE_START(ref_t, t, l) \
+	lua_tbx::l_layer_ref_mapping->insert({t::PROTO, TNAME(t)}); \
+	_INIT_TYPE_END
+
 
 /* We might want to stop using globals and instead do a global table,
  * this hook will allow for an easier transition */
@@ -52,36 +64,36 @@
 using namespace Crafter;
 
 /* Populate the tname<x> template */
-L_EXPOSE_TYPE(Layer);
-L_EXPOSE_TYPE(Packet);
 L_EXPOSE_TYPE(IP);
-template<> const char *tname<IPOptionLayer>::name = "IPOption";
 L_EXPOSE_TYPE(IPv6);
 L_EXPOSE_TYPE(IPv6SegmentRoutingHeader);
 L_EXPOSE_TYPE(TCP);
-template<> const char *tname<TCPOptionLayer>::name = "TCPOption";
-template<> const char *tname<TCPOptionTimestamp>::name = "TCPTimestamp";
-template<> const char *tname<TCPOptionFastOpen>::name = "TCPTFO";
-template<> const char *tname<TCPEDO>::name = "TCPEDO";
-template<> const char *tname<TCPEDORequest>::name = "TCPEDORequest";
+L_EXPOSE_TYPE_AS(TCPOptionTimestamp, TCPTimestamp);
+L_EXPOSE_TYPE_AS(TCPOptionFastOpen, TCPTFO);
+L_EXPOSE_TYPE_AS(TCPOptionEDO, TCPEDO);
 L_EXPOSE_TYPE(UDP);
 L_EXPOSE_TYPE(ICMP);
 L_EXPOSE_TYPE(RawLayer);
-L_EXPOSE_TYPE(PacketModifications);
-L_EXPOSE_TYPE(FWFilter);
 L_EXPOSE_TYPE(DNS);
-template<> const char *tname<DNS::DNSQuery>::name = "DNSQuery";
-template<> const char *tname<DNS::DNSAnswer>::name = "DNSAnswer";
+L_EXPOSE_TYPE(PartialTCP);
+L_EXPOSE_TYPE(Layer);
+L_EXPOSE_TYPE(Packet);
+L_EXPOSE_TYPE_AS(TCPOptionLayer, TCPOption);
+L_EXPOSE_TYPE(FWFilter);
+L_EXPOSE_TYPE(PacketModifications);
+L_EXPOSE_TYPE_AS(DNS::DNSQuery, DNSQuery);
+L_EXPOSE_TYPE_AS(DNS::DNSAnswer, DNSAnswer);
+L_EXPOSE_TYPE_AS(IPOptionLayer, IPOption);
 #ifdef HAVE_SNIFFER
 L_EXPOSE_TYPE(TbxSniffer);
 #endif
 
 /* lua_tracebox.cpp */
 extern int l_Tracebox(lua_State *l);
+extern int l_set_ttl_range(lua_State *);
 /* lua_utils.cpp */
 extern int l_sleep(lua_State *l);
 extern int l_dump_stack(lua_State *l);
-extern int l_cpp_object_count(lua_State *l);
 extern int l_dn6(lua_State *l);
 extern int l_dn4(lua_State *l);
 extern int l_gethostname(lua_State *l);
@@ -93,27 +105,27 @@ lua_State *l_init()
 	luaL_openlibs(l);
 	/* Create types metatables */
 	INIT_TYPE(l_packet_ref,                    Packet,                   l);
-	INIT_TYPE(l_ip_ref,                        IP,                       l);
+	INIT_LAYER(l_ip_ref,                        IP,                       l);
 	INIT_TYPE(l_ipoption_ref,                  IPOptionLayer,            l);
-	INIT_TYPE(l_ipv6_ref,                      IPv6,                     l);
-	INIT_TYPE(l_ipv6segmentroutingheader_ref,  IPv6SegmentRoutingHeader, l);
-	INIT_TYPE(l_tcp_ref,                       TCP,                      l);
+	INIT_LAYER(l_ipv6_ref,                      IPv6,                     l);
+	INIT_LAYER(l_ipv6segmentroutingheader_ref,  IPv6SegmentRoutingHeader, l);
+	INIT_LAYER(l_tcp_ref,                       TCP,                      l);
 	INIT_TYPE(l_tcpoption_ref,                 TCPOptionLayer,           l);
-	INIT_TYPE(l_tcptsopt_ref,                  TCPOptionTimestamp,       l);
-	INIT_TYPE(l_tcptfo_ref,                    TCPOptionFastOpen,        l);
-	INIT_TYPE(l_tcpedoopt_ref,                 TCPEDO,       l);
-	INIT_TYPE(l_tcpedoropt_ref,				   TCPEDORequest,       l);
-	INIT_TYPE(l_udp_ref,                       UDP,                      l);
-	INIT_TYPE(l_icmp_ref,                      ICMP,                     l);
-	INIT_TYPE(l_raw_ref,                       RawLayer,                 l);
+	INIT_LAYER(l_tcptsopt_ref,                  TCPOptionTimestamp,       l);
+	INIT_LAYER(l_tcptfo_ref,                    TCPOptionFastOpen,        l);
+	INIT_LAYER(l_tcpedoopt_ref,                 TCPOptionEDO,             l);
+	INIT_LAYER(l_udp_ref,                       UDP,                      l);
+	INIT_LAYER(l_icmp_ref,                      ICMP,                     l);
+	INIT_LAYER(l_raw_ref,                       RawLayer,                 l);
+	INIT_LAYER(l_dns_ref,                       DNS,                      l);
 	INIT_TYPE(l_packetmodifications_ref,       PacketModifications,      l);
 	INIT_TYPE(l_fwfilter_ref,                  FWFilter,                 l);
-	INIT_TYPE(l_dns_ref,                       DNS,                      l);
 	INIT_TYPE(l_dnsquery_ref,                  DNS::DNSQuery,            l);
 	INIT_TYPE(l_dnsanswer_ref,                 DNS::DNSAnswer,           l);
 	#ifdef HAVE_SNIFFER
 	INIT_TYPE(l_sniffer_ref,                   TbxSniffer,               l);
 	#endif
+	INIT_LAYER(l_partialtcp_ref, PartialTCP, l);
 
 	REGISTER_FUNCTION(l, "tracebox", l_Tracebox);
 	REGISTER_FUNCTION(l, "sleep", l_sleep);
@@ -121,8 +133,8 @@ lua_State *l_init()
 	REGISTER_FUNCTION(l, "dn6", l_dn6);
 	REGISTER_FUNCTION(l, "gethostname", l_gethostname);
 	REGISTER_FUNCTION(l, "__dump_c_stack", l_dump_stack);
-	REGISTER_FUNCTION(l, "__cpp_object_count", l_cpp_object_count);
 	REGISTER_FUNCTION(l, "random", l_random);
+	REGISTER_FUNCTION(l, "set_ttl_range", l_set_ttl_range);
 
 	return l;
 }
@@ -250,7 +262,7 @@ void l_ip_ref::register_globals(lua_State *l)
 	 * @see IP:new
 	 * @within IP
 	 */
-	l_do(l, "IP=ip({})");
+	l_do(l, "IP=ip({id=math.random(65535)})");
 }
 
 void l_ipoption_ref::register_globals(lua_State *l)
@@ -310,14 +322,14 @@ void l_ipoption_ref::register_globals(lua_State *l)
 	lua_register(l, "traceroute", l_IP_Traceroute);
 	/***
 	 * A default IP NOP object
-	 * @table NOP
+	 * @table IP_NOP
 	 * @see IPOption
 	 * @within IP
 	 */
 	l_do(l, "IP_NOP=ip_nop()");
 	/***
 	 * A default IP EOL object
-	 * @table EOL
+	 * @table IP_EOL
 	 * @see IPOption
 	 * @within IP
 	 */
@@ -372,7 +384,7 @@ void l_ipv6_ref::register_globals(lua_State *l)
 	 * @see IPv6
 	 * @within IPv6
 	 */
-	l_do(l, "IPv6=ipv6({})");
+	l_do(l, "IPv6=ipv6({flowlabel=math.random(1048575)})");
 }
 
 void l_ipv6segmentroutingheader_ref::register_globals(lua_State *l)
@@ -557,42 +569,38 @@ void l_tcpoption_ref::register_globals(lua_State *l)
 
 void l_tcpedoopt_ref::register_globals(lua_State *l)
 {
-	l_layer_ref<TCPEDO>::register_globals(l);
+	l_layer_ref<TCPOptionEDO>::register_globals(l);
 	/***
-	 * Construct a  TCPOption EDO, shorthand for @{TCPExtendedDataOption.TCPEDO:new}
+	 * Construct a  TCPOption EDO, shorthand for @{TCPEDO:new}
 	 * @function edo
 	 * @treturn TCPEDO
-	 * @see TCPExtendedDataOption.TCPEDO:new
-	 * @within TCPExtendedDataOption
+	 * @see TCPEDO:new
+	 * @within TCP
 	 */
 	lua_register(l, "edo", l_TCP_EDO);
 	/***
-	 * A default TCPOption EDO object
+	 * A TCPEDO option that will contain the header length field
 	 * @table EDO
-	 * @see TCPExtendedDataOption.TCPEDO:new
-	 * @within TCPExtendedDataOption
+	 * @see TCPEDO:new
+	 * @within TCP
 	 */
-	l_do(l, "EDO=NOP/NOP/edo{}");
-}
-
-void l_tcpedoropt_ref::register_globals(lua_State *l)
-{
-	l_layer_ref<TCPEDORequest>::register_globals(l);
-		/***
-	 * Construct a  TCPOption EDORequest, shorthand for @{TCPExtendedDataOption.TCPEDORequest:new}
-	 * @function edorequest
-	 * @treturn TCPEDORequest
-	 * @see TCPExtendedDataOption.TCPEDORequest:new
-	 * @within TCPExtendedDataOption
-	 */
-	lua_register(l, "edorequest", l_TCP_EDOR);
+	l_do(l, "EDO=edo(TCPEDO.EDO)");
 	/***
-	 * A default TCPOption EDORequest object
+	 * A TCPEDO option to be used during the handshake negociation,
+	 * requires padding (length is 2 bytes)
 	 * @table EDOREQUEST
-	 * @see TCPExtendedDataOption.TCPEDORequest:new
-	 * @within TCPExtendedDataOption
+	 * @see TCPEDO:new
+	 * @within TCP
 	 */
-	l_do(l, "EDOREQUEST=NOP/NOP/edorequest{}");
+	l_do(l, "EDOREQUEST=edo(TCPEDO.EDOREQUEST)");
+	/***
+	 * A TCPEDO option containing the header length and the segment length,
+	 * requires padding (length is 6 bytes)
+	 * @table EDOEXT
+	 * @see TCPEDO:new
+	 * @within TCP
+	 */
+	l_do(l, "EDOEXT=edo(TCPEDO.EDOEXT)");
 }
 
 void l_tcptsopt_ref::register_globals(lua_State *l)

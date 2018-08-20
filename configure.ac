@@ -1,9 +1,9 @@
-AC_INIT([tracebox], [0.3~td1.0], [olivier.tilmans@uclouvain.be],
-        [tracebox], [http://tracebox.org])
-AC_CONFIG_HEADERS([config.h])
+AC_INIT([tracebox], [0.4.4~td1.0], [olivier.tilmans@uclouvain.be],
+		[tracebox], [http://tracebox.org])
 AC_CONFIG_SRCDIR([src/tracebox/tracebox.cc])
 AC_PREREQ([2.59])
 AM_INIT_AUTOMAKE([1.10 tar-pax -Werror -Wall no-define foreign])
+m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 
 AM_PROG_AR
 LT_INIT
@@ -80,7 +80,7 @@ AC_DEFINE_UNQUOTED([DEFAULT_PCAP_FILENAME], "$default_pcap_filename",
 AC_ARG_WITH(upload-url,
             [  --with-upload-url="/default/capture/path"],
             [ default_url="$withval" ],
-            [ default_url="http://ns328523.ip-37-187-114.eu:3000/curl" ]
+            [ default_url="http://test1.multipath-tcp.org:18080/curl" ]
 )
 AC_DEFINE_UNQUOTED([DEFAULT_URL], "$default_url",
           [Default URL used when curl upload is enabled and no other URL is
@@ -264,6 +264,10 @@ if test -z "$LDOC";
     then AC_MSG_WARN([ldoc not found - not building the Lua bindings documentation])
 fi
 AM_CONDITIONAL([HAVE_LDOC],[test -n "$LDOC"])
+
+AC_DEFINE_UNQUOTED([_REV_PARSE],
+          ["$(git describe --abbrev=16 --always --tags)"],
+          ["Version number: tag-commits-g revision-branch status"])
 
 AC_CONFIG_FILES([
 	Makefile

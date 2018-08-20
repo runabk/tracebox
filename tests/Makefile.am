@@ -1,12 +1,11 @@
 
 SUBDIRS = tools
 
-lua_scripts = lua/refcounting.lua \
-			  lua/sleep.lua \
-			  lua/dns.lua \
+lua_scripts = lua/sleep.lua \
 			  lua/packet.lua \
 			  lua/tcpoption.lua \
-			  lua/arguments.lua
+			  lua/arguments.lua \
+			  lua/ip_argument.lua
 
 click_configs_in = \
 	labs/test0.in \

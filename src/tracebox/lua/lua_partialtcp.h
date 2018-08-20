@@ -5,17 +5,16 @@
  *  Some rights reserved. See LICENSE, AUTHORS.
  */
 
-#ifndef __LUA_UDP_H_
-#define __LUA_UDP_H_
+#ifndef __LUA_PARTIALTCP_H_
+#define __LUA_PARTIALTCP_H_
 
 #include "lua_layer.hpp"
+#include "../PartialHeader.h"
 
-struct l_udp_ref : public l_layer_ref<Crafter::UDP> {
-	using l_layer_ref<Crafter::UDP>::l_layer_ref;
+struct l_partialtcp_ref : public l_layer_ref<Crafter::PartialTCP> {
+	using l_layer_ref<Crafter::PartialTCP>::l_layer_ref;
 
-	static int l_UDP(lua_State *l);
 	static void register_members(lua_State *l);
-	static void register_globals(lua_State *l);
 };
 
 #endif

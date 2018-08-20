@@ -25,6 +25,7 @@ tracebox_SOURCES = \
 	lua/lua_ipv6segmentroutingheader.cpp \
 	lua/lua_packetmodifications.cpp \
 	lua/lua_packet.cpp \
+	lua/lua_partialtcp.cpp \
 	lua/lua_raw.cpp \
 	lua/lua_tcp.cpp \
 	lua/lua_tcpoption.cpp \
@@ -50,8 +51,10 @@ noinst_HEADERS = \
 	lua/lua_ipoption.hpp \
 	lua/lua_ipv6.h \
 	lua/lua_ipv6segmentroutingheader.h \
+	lua/lua_layer.hpp \
 	lua/lua_packet.hpp \
 	lua/lua_packetmodifications.h \
+	lua/lua_partialtcp.h \
 	lua/lua_raw.h \
 	lua/lua_tcp.h \
 	lua/lua_tcpoption.hpp \
