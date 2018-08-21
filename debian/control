@@ -21,7 +21,7 @@ Homepage: http://www.tracebox.org
 Package: tracebox
 Architecture: any
 Depends: libcurl4-gnutls-dev,
-         libjson-c3,
+         libjson-c3 | libjson-c2,
          liblua5.2-0,
          libnetfilter-queue1,
          libpcap0.8,
