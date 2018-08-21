@@ -95,7 +95,7 @@ void BuildTransportLayer<TCP::PROTO>(Packet *pkt, int dport, int sport,const cha
 }
 
 template<>
-void BuildTransportLayer<UDP::PROTO>(Packet *pkt, int dport)
+void BuildTransportLayer<UDP::PROTO>(Packet *pkt, int dport,int sport,const char *in_str)
 {
 	UDP udp = UDP();
 	udp.SetSrcPort(sport);
@@ -209,6 +209,7 @@ Packet *BuildProbe(int net, int tr, int dport, int sport,const char *in_str)
 		BuildNetworkLayer<IPv6::PROTO>(pkt);
 		break;
 	}
+	
 	switch(tr) {
 	case IPSec::PROTO:
                 BuildTransportLayer<IPSec::PROTO>(pkt, dport,sport,in_str);
@@ -694,7 +695,7 @@ int doTracebox(std::shared_ptr<Packet> pkt_shrd, tracebox_cb_t *callback,
 		if (isPcap(iface))
 			rcv = PcapSendRecv(pkt, iface);
 		else{ // Write both pkt & rcv to pcap file
-			rcv = pkt->SendRecv(iface, tbx_default_timeout, 3);
+			rcv = pkt->SendRecv(iface, tbx_default_timeout, 1.5);
 			if(!isPcap(iface))
 				writePcap(pkt);
 		}
@@ -711,6 +712,8 @@ int doTracebox(std::shared_ptr<Packet> pkt_shrd, tracebox_cb_t *callback,
 		} else {
 			sIP = "";
 		}
+		if(rcv) 
+		  new_pkt = *rcv;
 		mod = PacketModifications::ComputeModifications(pkt_shrd, rcv);
 
 		/* The callback can stop the iteration */
