@@ -1,7 +1,7 @@
 Source: runa-tracebox
 Section: net
 Priority: extra
-Maintainer: Olivier Tilmans <olivier.tilmans@uclouvain.be>
+Maintainer: Runa Barik <runabk@ifi.uio.no>
 Build-Depends: autoconf,
                autotools-dev,
                debhelper (>= 9),
@@ -12,7 +12,6 @@ Build-Depends: autoconf,
                liblua5.2-dev,
                libnetfilter-queue-dev,
                libpcap-dev,
-               lua-ldoc,
                lua-sec,
                lua5.2,
                luarocks
@@ -35,7 +34,7 @@ Recommends: iputils-ping,
             subnetcalc,
             traceroute,
             whois
-Description: Tracebox
+Description: Runa's Tracebox
  Tracebox is a tool that allows to detect middleboxes on any paths, i.e.,
  between a source and any destination. Tracebox can be viewed as a tool similar
  to traceroute as it uses ICMP replies to identify changes in the packets.
