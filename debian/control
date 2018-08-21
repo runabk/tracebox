@@ -4,7 +4,7 @@ Priority: extra
 Maintainer: Olivier Tilmans <olivier.tilmans@uclouvain.be>
 Build-Depends: autoconf,
                autotools-dev,
-               debhelper (>= 10.2.5),
+               debhelper (>= 9),
                gcc (>= 6.3.0),
                git,
                libcurl4-gnutls-dev,
@@ -14,8 +14,9 @@ Build-Depends: autoconf,
                libpcap-dev,
                lua-ldoc,
                lua-sec,
+               lua5.2,
                luarocks
-Standards-Version: 0.4.4
+Standards-Version: 4.1.4
 Homepage: http://www.tracebox.org
 
 Package: runa-tracebox
