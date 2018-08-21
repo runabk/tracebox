@@ -1,4 +1,4 @@
-AC_INIT([tracebox], [0.4.4~td1.0], [olivier.tilmans@uclouvain.be],
+AC_INIT([tracebox], [0.4.4~td1.1], [olivier.tilmans@uclouvain.be],
 		[tracebox], [http://tracebox.org])
 AC_CONFIG_SRCDIR([src/tracebox/tracebox.cc])
 AC_PREREQ([2.59])
