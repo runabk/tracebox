@@ -1,4 +1,4 @@
-tracebox (0.4.4~td1.0) cosmic; urgency=medium
+runa-tracebox (0.4.4~td1.0) cosmic; urgency=medium
 
   * Initial Debian release (Closes: #xxxxxx).
   * Initial Ubuntu release (LP: #xxxxxx).
