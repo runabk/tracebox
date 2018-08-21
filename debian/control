@@ -12,6 +12,7 @@ Build-Depends: autoconf,
                liblua5.2-dev,
                libnetfilter-queue-dev,
                libpcap-dev,
+               lua-ldoc,
                lua-sec,
                lua5.2,
                luarocks
