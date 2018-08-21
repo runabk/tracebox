@@ -27,6 +27,9 @@ Depends: libcurl4-gnutls-dev,
          libpcap0.8,
          ${misc:Depends},
          ${shlibs:Depends}
+Conflicts: tracebox
+Replaces: tracebox
+Provides: tracebox
 Recommends: iputils-ping,
             iputils-tracepath,
             netperfmeter,
