@@ -917,7 +917,7 @@ int main(int argc, char *argv[])
                 	  int len_str = strlen(extra_payload) / 2;
                 	  byte payload1[len_str];
                 	  for (int i = 0; i < len_str; i++)
-                  	    sscanf(in_str + 2*i, "%02x",&payload1[i]);
+                  	    sscanf(extra_payload + 2*i, "%02x",&payload1[i]);
                 	pkt->PushLayer(RawLayer(payload1,len_str));
         		}
 		
