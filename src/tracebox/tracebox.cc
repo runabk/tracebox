@@ -1005,7 +1005,7 @@ usage:
 "  -b                          Use DCCP Request for static probe generated\n"
 "  -y                          Use UDPLite for static probe generated\n"
 "  -q                          Use IPSec for static probe generated\n"
-"  -o			       UDP with zero checksum and QUIC header\n"
+"  -o			       :0 for UDP with zero checksum and QUIC header\n"
 #ifdef HAVE_LIBCURL
 "  -c server_url               Specify a server where captured packets will be sent.\n"
 "  -C                          Same than -c, but use the server at " DEFAULT_URL ".\n"
