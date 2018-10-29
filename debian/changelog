@@ -1,3 +1,11 @@
+runa-tracebox (0.5.0~td1.1-1ubuntu1) cosmic; urgency=medium
+
+  * Runa's branch version.
+  * Initial Debian release (Closes: #xxxxxx).
+  * Initial Ubuntu release (LP: #xxxxxx).
+
+ -- Thomas Dreibholz <dreibh@iem.uni-due.de>  Mon, 29 Oct 2018 09:09:09 +0100
+
 runa-tracebox (0.4.4~td1.1-1ubuntu1) cosmic; urgency=medium
 
   * Runa's branch version.
