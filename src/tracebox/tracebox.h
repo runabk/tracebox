@@ -23,7 +23,7 @@ typedef int (tracebox_cb_t)(void *, uint8_t, std::string&, PacketModifications *
 IPLayer* probe_sanity_check(const Crafter::Packet *probe,
 		std::string& err, std::string& iface);
 
-int doTracebox(std::shared_ptr<Crafter::Packet> pkt, tracebox_cb_t *callback,
+int doTracebox(std::shared_ptr<Crafter::Packet> pkt,uint8_t dscp, tracebox_cb_t *callback,
 		std::string& err, void *ctx = NULL);
 
 int set_tracebox_ttl_range(uint8_t ttl_min, uint8_t ttl_max);

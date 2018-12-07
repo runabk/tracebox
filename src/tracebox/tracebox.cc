@@ -712,7 +712,7 @@ IPLayer* probe_sanity_check(const Packet *pkt, string& err, string& iface)
 	return ip;
 }
 
-int doTracebox(std::shared_ptr<Packet> pkt_shrd, tracebox_cb_t *callback,
+int doTracebox(std::shared_ptr<Packet> pkt_shrd,uint8_t dscp, tracebox_cb_t *callback,
 		string& err, void *ctx)
 {
 	Packet* rcv = NULL;
@@ -728,9 +728,11 @@ int doTracebox(std::shared_ptr<Packet> pkt_shrd, tracebox_cb_t *callback,
 		switch (ip->GetID()) {
 		case IP::PROTO:
 			reinterpret_cast<IP *>(ip)->SetTTL(ttl);
+			reinterpret_cast<IP *>(ip)->SetDiffServicesCP(dscp);
 			break;
 		case IPv6::PROTO:
 			reinterpret_cast<IPv6 *>(ip)->SetHopLimit(ttl);
+			reinterpret_cast<IPv6 *>(ip)->SetTrafficClass(dscp*4);
 			break;
 		default:
 			std::cerr << "Could not access the IPLayer from the probe, "
@@ -775,8 +777,102 @@ int doTracebox(std::shared_ptr<Packet> pkt_shrd, tracebox_cb_t *callback,
 		/* Stop if we reached the server */
 		if (rcv && sIP == ip->GetDestinationIP())
 			return 1;
+		
 	}
 	return 0;
+}
+
+
+int doFloodbox(int dport, int sport,uint8_t dscp_val, int n_pkts, int k_interval,string& err)
+{
+   
+    Packet **pktArryBE = new Packet * [hops_max+1-hops_min];
+    Packet *pktbe=BuildProbe(IP::PROTO, UDP::PROTO, dport,sport,NULL,10); 
+    IPLayer *ipbe = probe_sanity_check(pktbe, err, iface);
+    
+    Packet **pktArry = new Packet * [hops_max+1-hops_min]; 
+    Packet *pkt = BuildProbe(IP::PROTO, UDP::PROTO, dport,sport,NULL,10);
+    IPLayer *ip = probe_sanity_check(pkt, err, iface);
+     
+    int pktno=0;
+    for (uint8_t ttl = hops_min; ttl <= hops_max; ++ttl) {
+        switch (ip->GetID()) {
+            case IP::PROTO:
+                reinterpret_cast<IP *>(ip)->SetTTL(ttl);
+		reinterpret_cast<IP *>(ip)->SetIdentification(rand());
+		reinterpret_cast<IP *>(ip)->SetDiffServicesCP(dscp_val);
+                break;
+        }
+        pkt->PreCraft();
+	pktArry[pktno]=new Packet(*pkt);
+        
+        switch (ipbe->GetID()) {
+            case IP::PROTO:
+                reinterpret_cast<IP *>(ipbe)->SetTTL(ttl);
+		reinterpret_cast<IP *>(ipbe)->SetIdentification(rand());
+                break;
+        }
+        pktbe->PreCraft();
+        pktArryBE[pktno]=new Packet(*pktbe);
+        pktno++;
+    }
+    
+    Packet *floodpktbe=BuildProbe(IP::PROTO, UDP::PROTO, dport,60000,NULL,10);
+    IPLayer *floodipbe = probe_sanity_check(floodpktbe, err, iface); 
+    switch (floodipbe->GetID()) {
+            case IP::PROTO:
+                reinterpret_cast<IP *>(floodipbe)->SetTTL(hops_max+5);
+                break;
+        }
+        floodpktbe->PreCraft();
+    int ntimes=0;
+    for (int pktid = 0; pktid < n_pkts; pktid++) {
+        
+	floodpktbe->Send(iface);
+        if ((pktid+1) % k_interval == 0 && pktid > 0){
+        for (int pktt = 0; pktt < pktno; pktt++) {
+            pktArryBE[pktt]->Send(iface);
+            pktArry[pktt]->Send(iface);
+            }
+	   ntimes++;
+	   
+    	   pktbe=BuildProbe(IP::PROTO, UDP::PROTO, dport,sport+ntimes,NULL,10);
+    	   ipbe = probe_sanity_check(pktbe, err, iface);
+
+    	   
+           pkt = BuildProbe(IP::PROTO, UDP::PROTO, dport,sport+ntimes,NULL,10);
+    	   ip = probe_sanity_check(pkt, err, iface);
+
+    	   pktno=0;
+    	   for (uint8_t ttl = hops_min; ttl <= hops_max; ++ttl) {
+              switch (ip->GetID()) {
+                      case IP::PROTO:
+                	reinterpret_cast<IP *>(ip)->SetTTL(ttl);
+                	reinterpret_cast<IP *>(ip)->SetIdentification(rand());
+                	reinterpret_cast<IP *>(ip)->SetDiffServicesCP(dscp_val);
+                	break;
+        	}
+                pkt->PreCraft();
+                pktArry[pktno]=new Packet(*pkt);
+
+        	switch (ipbe->GetID()) {
+            		case IP::PROTO:
+                		reinterpret_cast<IP *>(ipbe)->SetTTL(ttl);
+                		reinterpret_cast<IP *>(ipbe)->SetIdentification(rand());
+                		break;
+        	}
+        	pktbe->PreCraft();
+        	pktArryBE[pktno]=new Packet(*pktbe);
+        	pktno++;
+    	    }
+	   sleep(1.0); 
+        }
+       
+     }        
+    delete[] pktArry;
+    delete[] pktArryBE;
+
+    return 0;
 }
 
 int set_tracebox_ttl_range(uint8_t ttl_min, uint8_t ttl_max)
@@ -807,17 +903,29 @@ int main(int argc, char *argv[])
 	string err;
 	bool inline_script = false;
 	PartialTCP::register_type();
-
+	
 	tracebox_cb_t *callback = Callback;
 
+	int npkts=0;
+	int kinterval=0;
+        uint8_t dscp=0;
 	/* disable libcrafter warnings */
 	ShowWarnings = 0;
-	while ((c = getopt(argc, argv, "e:Sl:i:M:m:s:p:d:x:f:hnv6uwjabqyto:VD"
+	while ((c = getopt(argc, argv, "e:Sl:i:M:m:s:N:K:F:p:d:x:f:hnv6uwjabqyto:VD"
 #ifdef HAVE_CURL
 					"Cc:"
 #endif
 					)) != -1) {
 		switch (c) {
+			case 'N':
+				npkts = strtol(optarg, NULL, 10);
+                                break;
+			case 'K':
+                                kinterval = strtol(optarg, NULL, 10);
+                                break;
+			case 'F':
+                                dscp = strtol(optarg, NULL, 10);
+                                break;
 			case 'o':
                                 flag = strtol(optarg, NULL, 10);
                                 break;
@@ -920,7 +1028,7 @@ int main(int argc, char *argv[])
 				goto usage;
 		}
 	}
-
+    
     if (set_tracebox_ttl_range(hops_min, hops_max) < 0) {
 		cerr << "Cannot use the specified TTL range: [" << hops_min << ", " << hops_max << "]" << std::endl;
 		goto usage;
@@ -963,9 +1071,20 @@ int main(int argc, char *argv[])
 	if (!pkt)
 		return EXIT_FAILURE;
 
-	if (doTracebox(std::shared_ptr<Packet>(pkt), callback, err) < 0) {
+	if (npkts == 0 && kinterval == 0){
+	    if (doTracebox(std::shared_ptr<Packet>(pkt),dscp,callback,err) < 0)
+		{
+		cerr << "Error: " << err << endl;
+                goto usage;
+        	}
+	}
+	
+	if (npkts > 0 && kinterval > 0){
+
+	 if (doFloodbox(dport,sport,dscp,npkts,kinterval,err) < 0) {
 		cerr << "Error: " << err << endl;
 		goto usage;
+	  }
 	}
 
 	if (jobj != NULL) {
@@ -1006,6 +1125,9 @@ usage:
 "  -y                          Use UDPLite for static probe generated\n"
 "  -q                          Use IPSec for static probe generated\n"
 "  -o			       :0 for UDP with zero checksum and QUIC header\n"
+"  -N			       Total number of UDP packets with DSCP CS0 to be sent\n"
+"  -K			       Number of UDP packets interval after which we send TTL-limited UDP with CS0 and other codepoints all at once\n"
+"  -F			       DSCP value (in integer) to be set in tracebox packets\n"
 #ifdef HAVE_LIBCURL
 "  -c server_url               Specify a server where captured packets will be sent.\n"
 "  -C                          Same than -c, but use the server at " DEFAULT_URL ".\n"

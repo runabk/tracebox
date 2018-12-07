@@ -130,7 +130,8 @@ int l_Tracebox(lua_State *l)
 
 
 no_args:
-	ret = doTracebox(pref, tCallback, err, &info);
+	uint8_t dscp=0;
+	ret = doTracebox(pref,dscp, tCallback, err, &info);
 	if (ret < 0) {
 		const char* msg = lua_pushfstring(l, "Tracebox error: %s", err.c_str());
 		luaL_argerror(l, -1, msg);
