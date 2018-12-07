@@ -16,7 +16,7 @@ Build-Depends: autoconf,
                lua-sec,
                lua5.2,
                luarocks
-Standards-Version: 4.1.4
+Standards-Version: 4.2.1
 Homepage: http://www.tracebox.org
 
 Package: runa-tracebox
