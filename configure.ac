@@ -1,4 +1,4 @@
-AC_INIT([runa-tracebox], [0.5.0~td1.2], [runabk@ifi.uio.no],
+AC_INIT([runa-tracebox], [0.5.0~td1.3], [runabk@ifi.uio.no],
 		[runa-tracebox], [http://tracebox.org])
 AC_CONFIG_SRCDIR([src/tracebox/tracebox.cc])
 AC_PREREQ([2.59])
