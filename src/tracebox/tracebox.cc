@@ -871,7 +871,7 @@ int doTracebox(std::shared_ptr<Packet> pkt_shrd,uint8_t dscp, tracebox_cb_t *cal
 		if (isPcap(iface))
 			rcv = PcapSendRecv(pkt, iface);
 		else{ // Write both pkt & rcv to pcap file
-			rcv = pkt->SendRecv(iface, tbx_default_timeout, 1.5);
+			rcv = pkt->SendRecv(iface, tbx_default_timeout, 1.0);
 			if(!isPcap(iface))
 				writePcap(pkt);
 		}
