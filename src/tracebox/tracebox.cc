@@ -60,6 +60,7 @@ static bool skip_suid_check = false;
 static uint8_t hops_max = 64;
 static uint8_t hops_min = 1;
 static uint8_t hops_max_dscp = 30;
+static int global_pktid;
 
 static string destination;
 static string iface;
@@ -840,17 +841,17 @@ int doTracebox(std::shared_ptr<Packet> pkt_shrd,uint8_t dscp, tracebox_cb_t *cal
 	if (!ip)
 		return -1;
 
-        int pkt_id=1000;
+        //int pkt_id=1000;
 	for (uint8_t ttl = hops_min; ttl <= hops_max; ++ttl) {
 		switch (ip->GetID()) {
 		case IP::PROTO:
 			reinterpret_cast<IP *>(ip)->SetTTL(ttl);
-                        reinterpret_cast<IP *>(ip)->SetIdentification(pkt_id);
+                        reinterpret_cast<IP *>(ip)->SetIdentification(global_pktid);
 			reinterpret_cast<IP *>(ip)->SetDiffServicesCP(dscp);
                         
-                        pkt_id++;
-                        if(pkt_id>20000)
-                            pkt_id=1000;
+                        //pkt_id++;
+                        //if(pkt_id>20000)
+                        //    pkt_id=1000;
 			break;
 		case IPv6::PROTO:
 			reinterpret_cast<IPv6 *>(ip)->SetHopLimit(ttl);
@@ -1242,7 +1243,7 @@ int main(int argc, char *argv[])
         rc = setpriority(PRIO_PROCESS, 0, 0);
     }
         
-	while ((c = getopt(argc, argv, "e:Sl:i:A:B:M:m:s:N:K:F:P:T:L:p:d:x:f:hnzv6uwjabqyto:VD"
+	while ((c = getopt(argc, argv, "e:Sl:i:A:B:M:m:s:N:K:F:P:T:L:p:d:I:x:f:hnzv6uwjabqyto:VD"
 #ifdef HAVE_CURL
 					"Cc:"
 #endif
@@ -1302,6 +1303,9 @@ int main(int argc, char *argv[])
 			case 'd':
 				dport = strtol(optarg, NULL, 10);
 				break;
+		        case 'I':
+                                global_pktid = strtol(optarg, NULL, 10);
+                                break;
 			case 'x':
                                 sport = strtol(optarg, NULL, 10);
                                 break;
@@ -1501,6 +1505,7 @@ usage:
 "  -d port                     Use the specified port for static probe\n"
 "                              generated. Default is 80.\n"
 "  -i device                   Specify a network interface to operate with\n"
+"  -I packet_id                Specify a packet id number for IPv4 headdr\n"
 "  -m hops_max                 Set the max number of hops (max TTL to be reached).\n"
 "                              Default is 30.\n"
 "  -M hops_min                 Set the min number of hops (min TTL to be reached).\n"
