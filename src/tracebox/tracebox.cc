@@ -60,7 +60,7 @@ static bool skip_suid_check = false;
 static uint8_t hops_max = 64;
 static uint8_t hops_min = 1;
 static uint8_t hops_max_dscp = 30;
-static int global_pktid;
+static int global_pktid = 500;
 
 static string destination;
 static string iface;
