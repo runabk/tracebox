@@ -7,7 +7,7 @@ Build-Depends: autoconf,
                debhelper (>= 9),
                gcc (>= 6.3.0),
                git,
-               libcurl4-gnutls-dev,
+               libcurl4-openssl-dev | libcurl4-gnutls-dev,
                libjson-c-dev,
                liblua5.2-dev,
                libnetfilter-queue-dev,
@@ -21,7 +21,7 @@ Homepage: http://www.tracebox.org
 
 Package: runa-tracebox
 Architecture: any
-Depends: libcurl4-gnutls-dev,
+Depends: libcurl4-openssl-dev | libcurl4-gnutls-dev,
          libjson-c3 | libjson-c2,
          liblua5.2-0,
          libnetfilter-queue1,
