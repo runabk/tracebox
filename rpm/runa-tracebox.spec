@@ -1,5 +1,5 @@
-Name:           tracebox
-Version:        0.1~td4.1
+Name:           runa-tracebox
+Version:        0.5.0~td1.5
 Release:        1%{?dist}
 Summary:        -
 
