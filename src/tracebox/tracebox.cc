@@ -642,7 +642,7 @@ static int Callback(void *ctx, uint8_t ttl, string& router,
 			head_layer = (*r_pkt)[layer_pos];
 			if ( head_layer->GetID() == ICMPv6::PROTO )
                         {
-                                ICMPv6 *icmp = r_pkt->GetLayer<ICMPv6>(icmp_pos);
+                                ICMPv6 *icmp = r_pkt->GetLayer<ICMPv6>(layer_pos);
                                 cout << (int)icmp->GetType() << " " << icmp->GetCode() << " ";
                         }
                         break;
@@ -702,7 +702,7 @@ static int Callback_JSON(void *ctx, uint8_t ttl, string& router,
                                 head_layer = (*r_pkt)[layer_pos];
 				if ( head_layer->GetID() == ICMPv6::PROTO )
                                 {
-                                        ICMPv6 *icmp = r_pkt->GetLayer<ICMPv6>(icmp_pos);
+                                        ICMPv6 *icmp = r_pkt->GetLayer<ICMPv6>(layer_pos);
                                         json_object_object_add(hop,"icmp_type", json_object_new_int(icmp->GetType()));
                                         json_object_object_add(hop,"icmp_code", json_object_new_int(icmp->GetCode()));
                                 }
