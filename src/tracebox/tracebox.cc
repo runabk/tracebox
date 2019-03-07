@@ -620,24 +620,32 @@ static int Callback(void *ctx, uint8_t ttl, string& router,
 			cout << (int)ttl << ": " << GetHostname(router) << " (" << router << ") ";
 		IPLayer *ip_l = r_pkt->GetLayer<IPLayer>();
 
+		const Layer *head_layer;
+                size_t layer_pos;
+                int protocol=0;
+                for (layer_pos = 0; layer_pos < r_pkt->GetLayerCount() && protocol != IP::PROTO && protocol != IPv6::PROTO; ++layer_pos)
+                { 
+                   head_layer = (*r_pkt)[layer_pos];
+                   protocol = head_layer->GetID();
+                }
                 switch (ip_l->GetID()) {
                 case IP::PROTO:
-
-                        IP *r_ip = reinterpret_cast<IP *>(ip_l);
-                        if ( (int)r_ip->GetProtocol() == 1)
+                        //IP *r_ip = reinterpret_cast<IP *>(ip_l);
+			head_layer = (*r_pkt)[layer_pos];
+                        if ( head_layer->GetID() == ICMP::PROTO  )
                         {
-                                ICMP *icmp = r_pkt->GetLayer<ICMP>();
+                                ICMP *icmp = r_pkt->GetLayer<ICMP>(layer_pos);
                                 cout << (int)icmp->GetType() << " " << (int)icmp->GetCode() << " ";
                         }
                         break;
-                /*case IPv6::PROTO:
-                        IPv6 *r_ip = reinterpret_cast<IPv6 *>(ip_l);
-                        if ( (int)r_ip->GetNextHeader() == 58)
+                case IPv6::PROTO:
+			head_layer = (*r_pkt)[layer_pos];
+			if ( head_layer->GetID() == ICMPv6::PROTO )
                         {
-                                ICMPv6 *icmp = r_pkt->GetLayer<ICMPv6>();
+                                ICMPv6 *icmp = r_pkt->GetLayer<ICMPv6>(icmp_pos);
                                 cout << (int)icmp->GetType() << " " << icmp->GetCode() << " ";
                         }
-                        break;*/
+                        break;
                 }
 		cout << timeval_diff(rcv->GetTimestamp(), probe->GetTimestamp()) / 1000 << "ms ";
 		if (mod) {
@@ -669,28 +677,36 @@ static int Callback_JSON(void *ctx, uint8_t ttl, string& router,
 	if (rcv) {
 			ip = rcv->GetLayer<IPLayer>();
 			IPLayer *ip_l = r_pkt->GetLayer<IPLayer>();
-
+		
+			const Layer *head_layer;
+                        size_t layer_pos;
+                        int protocol=0;
+                        for (layer_pos = 0; layer_pos < r_pkt->GetLayerCount() && protocol != IP::PROTO && protocol != IPv6::PROTO; ++layer_pos)
+                        {
+                          head_layer = (*r_pkt)[layer_pos];
+                          protocol = head_layer->GetID();
+                        }
                         switch (ip_l->GetID()) {
                         case IP::PROTO:
-                                IP *r_ip = reinterpret_cast<IP *>(ip_l);
-                                if ( (int)r_ip->GetProtocol() == 1)
+				head_layer = (*r_pkt)[layer_pos];
+                                //IP *r_ip = reinterpret_cast<IP *>(ip_l);
+                                if ( head_layer->GetID() == ICMP::PROTO  )
                                 {
-                                        ICMP *icmp = r_pkt->GetLayer<ICMP>();
+                                        ICMP *icmp = r_pkt->GetLayer<ICMP>(layer_pos);
                                         json_object_object_add(hop,"icmp_type", json_object_new_int(icmp->GetType()));
                                         json_object_object_add(hop,"icmp_code", json_object_new_int(icmp->GetCode()));
                                         
                                 }
                                 break;
-                        /*case IPv6::PROTO:
-                                IPv6 *r_ip = GetIPv6(*r_pkt);
-                                //IPv6 *r_ip = reinterpret_cast<IPv6 *>(ip_l);
-                                if ( (int)r_ip->GetNextHeader() == 58)
+                        case IPv6::PROTO:
+                                head_layer = (*r_pkt)[layer_pos];
+				if ( head_layer->GetID() == ICMPv6::PROTO )
                                 {
-                                        ICMPv6 *icmp = r_pkt->GetLayer<ICMPv6>();
+                                        ICMPv6 *icmp = r_pkt->GetLayer<ICMPv6>(icmp_pos);
                                         json_object_object_add(hop,"icmp_type", json_object_new_int(icmp->GetType()));
                                         json_object_object_add(hop,"icmp_code", json_object_new_int(icmp->GetCode()));
                                 }
-                                break;*/
+                                break;
                                 }
 
                         /*
@@ -855,6 +871,7 @@ int doTracebox(std::shared_ptr<Packet> pkt_shrd,uint8_t dscp, tracebox_cb_t *cal
 			break;
 		case IPv6::PROTO:
 			reinterpret_cast<IPv6 *>(ip)->SetHopLimit(ttl);
+			reinterpret_cast<IPv6 *>(ip)->SetFlowLabel(global_pktid);
 			reinterpret_cast<IPv6 *>(ip)->SetTrafficClass(dscp*4);
 			break;
 		default:
