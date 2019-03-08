@@ -179,19 +179,19 @@ void BuildTransportLayer<UDP::PROTO>(Packet *pkt, int dport,int sport,const char
             
             char sample_str[]="0123456789abcdef";
             char *tmp = NULL;
-            byte payload[1472];
+            byte payload[1450];
             
             struct timeval  tv;
             gettimeofday(&tv, NULL);
             srand((tv.tv_sec) * 1000 + (tv.tv_usec) / 1000);
             //srand(time(NULL));
-            for(int i=0; i< 1472; i++)
+            for(int i=0; i< 1450; i++)
             {
                 asprintf(&tmp, "%c%c", sample_str[rand()%16],sample_str[rand()%16]);
                 sscanf(tmp, "%02x",&payload[i]);
             }
         
-            pkt->PushLayer(RawLayer(payload,1472));
+            pkt->PushLayer(RawLayer(payload,1450));
         }
 }
 
@@ -252,19 +252,19 @@ void BuildTransportLayer<UDPLite::PROTO>(Packet *pkt, int dport,int sport,const 
 
             char sample_str[]="0123456789abcdef";
             char *tmp = NULL;
-            byte payload[1472];
+            byte payload[1450];
 
             struct timeval  tv;
             gettimeofday(&tv, NULL);
             srand((tv.tv_sec) * 1000 + (tv.tv_usec) / 1000);
             //srand(time(NULL));
-            for(int i=0; i< 1472; i++)
+            for(int i=0; i< 1450; i++)
             {
                 asprintf(&tmp, "%c%c", sample_str[rand()%16],sample_str[rand()%16]);
                 sscanf(tmp, "%02x",&payload[i]);
             }
 
-            pkt->PushLayer(RawLayer(payload,1472));
+            pkt->PushLayer(RawLayer(payload,1450));
         }
 }
 
