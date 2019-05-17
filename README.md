@@ -1,6 +1,10 @@
-# Tracebox
+# FloodBox
 
 [![Build Status](https://travis-ci.org/tracebox/tracebox.png?branch=master)](https://travis-ci.org/tracebox/tracebox) [![CircleCI](https://circleci.com/gh/tracebox/tracebox.svg?style=svg)](https://circleci.com/gh/tracebox/tracebox)
+
+[FloodBox] is a function implemented inside [Tracebox](http://www.tracebox.org) to measure the impact of DSCP values of latency of the traffic. [FloodBox] uses UDP probes. It first measures the number of hops, H, that a particular DSCP code point survives on the Internet path. Then, it transmits several congestion DSCP CS0 UDP probes towards the destination, TTL- limited to avoid flooding the final destination along with specific DSCP TTL-limited UDP probes.
+
+## Follow the steps to install [Tracebox] to use [FloodBox].
 
 [Tracebox](http://www.tracebox.org) is a tool that allows to detect middleboxes on any paths, i.e., between a source and any destination. Tracebox can be viewed as a tool similar to traceroute as it uses ICMP replies to identify changes in the packets. The fact that tracebox is able to detect middleboxes comes from the observation that ICMP messages are often not as defined in RFC792. Indeed it is quite common to receive a ICMP Time-to-Live exceeded message with the original datagram instead of 64 bits as described in the standard. This is caused by operating systems configured to reply with full ICMP (e.g., Linux, Cisco IOS-XR, etc.) as well as the ICMP Multi-Part Messages extension that standardize the fact that routers using MPLS tunnels replies and ICMP message containing the full datagram.
 
