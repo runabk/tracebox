@@ -1,6 +1,6 @@
 Name:           runa-tracebox
-Version:        0.5.0~td1.5
-Release:        1%{?dist}
+Version:        0.5.0~td1.6
+Release:        1
 Summary:        -
 
 Group:          Applications/Internet

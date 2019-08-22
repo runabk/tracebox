@@ -1,5 +1,4 @@
-AC_INIT([runa-tracebox], [0.5.0~td1.5], [runabk@ifi.uio.no],
-		[runa-tracebox], [http://tracebox.org])
+AC_INIT([runa-tracebox], [0.5.0~td1.6], [runabk@ifi.uio.no], [runa-tracebox], [http://tracebox.org])
 AC_CONFIG_SRCDIR([src/tracebox/tracebox.cc])
 AC_PREREQ([2.59])
 AM_INIT_AUTOMAKE([1.10 tar-pax -Werror -Wall no-define foreign])
