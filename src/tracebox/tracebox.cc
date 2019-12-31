@@ -1180,17 +1180,18 @@ int doFloodbox(int dport, int sport,uint8_t dscp_val, int n_pkts, int k_interval
 	pktno=0;
         for (uint8_t ttl = hops_min; ttl <= hops_max_dscp; ++ttl) {
             
+	     datasize = pktArryBE[(hops_max_dscp+1-hops_min) * i + pktno]->GetSize();
+             data = pktArryBE[(hops_max_dscp+1-hops_min) * i + pktno]->GetRawPtr();
+             if (sendto (s, data, datasize, 0, (struct sockaddr *) &iface_device, sizeof (iface_device)) <= 0) {
+                std::cerr << "0DSCP" <<datasize<< std::endl;
+                }
+
              datasize = pktArry[(hops_max_dscp+1-hops_min) * i + pktno]->GetSize();
              data = pktArry[(hops_max_dscp+1-hops_min) * i + pktno]->GetRawPtr();
              if (sendto (s, data, datasize, 0, (struct sockaddr *) &iface_device, sizeof (iface_device)) <= 0) {
                 std::cerr <<  "DSCP" <<datasize<< std::endl;
     		   }
                  
-             datasize = pktArryBE[(hops_max_dscp+1-hops_min) * i + pktno]->GetSize();
-             data = pktArryBE[(hops_max_dscp+1-hops_min) * i + pktno]->GetRawPtr();
-             if (sendto (s, data, datasize, 0, (struct sockaddr *) &iface_device, sizeof (iface_device)) <= 0) {
-                std::cerr << "0DSCP" <<datasize<< std::endl;
-                }
         
         pktno++;
         
