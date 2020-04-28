@@ -11,6 +11,8 @@ endif
 SUBDIRS = noinst src $(MAYBE_OPT) $(MAYBE_DOC)
 DIST_SUBDIRS = noinst src tests doc
 
+EXTRA_DIST = bootstrap.sh
+
 debian-package:
 	dpkg-buildpackage -rfakeroot -tc -us -uc
 
