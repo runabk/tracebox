@@ -22,9 +22,9 @@ Requires:       libpcap, libdnet, lua, scapy, pcapy
 %build
 rm -rf noinst/libcrafter
 rm -rf tests/tools/click
-git clone --depth=1 https://github.com/gdetal/libcrafter.git noinst/libcrafter
+git clone --depth=1 https://github.com/pellegre/libcrafter.git noinst/libcrafter
 git clone --depth=1 https://github.com/bhesmans/click.git tests/tools/click
-./bootstrap.sh
+autoreconf -if
 
 %configure --enable-tests --disable-scripts --prefix=/usr
 make %{?_smp_mflags}
