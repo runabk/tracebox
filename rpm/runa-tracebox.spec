@@ -9,7 +9,7 @@ URL:            http://www.tracebox.org
 Source:         %{name}-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
-BuildRequires:  autoconf, automake, gcc-c++, json-c-devel, libtool, libpcap-devel, libdnet-devel, lua-devel, python-devel, git, fakeroot
+BuildRequires:  autoconf, automake, gcc-c++, json-c-devel, libtool, libpcap-devel, libdnet-devel, lua-devel, lua-ldoc, python-devel, git, fakeroot
 Requires:       libpcap, libdnet, lua, scapy, pcapy
 
 %description
