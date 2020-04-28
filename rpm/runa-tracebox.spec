@@ -1,7 +1,7 @@
 Name:           runa-tracebox
 Version:        0.5.0~td1.6
 Release:        1
-Summary:        -
+Summary:        Runa's TraceBox tool
 
 Group:          Applications/Internet
 License:        GPL
@@ -9,7 +9,7 @@ URL:            http://www.tracebox.org
 Source:         %{name}-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
-BuildRequires:  autoconf, automake, libtool, libpcap-devel, libdnet-devel, lua-devel, python-devel, git, fakeroot
+BuildRequires:  autoconf, automake, gcc-c++, json-c-devel, libtool, libpcap-devel, libdnet-devel, lua-devel, python-devel, git, fakeroot
 Requires:       libpcap, libdnet, lua, scapy, pcapy
 
 %description
@@ -24,8 +24,7 @@ rm -rf noinst/libcrafter
 rm -rf tests/tools/click
 git clone --depth=1 https://github.com/gdetal/libcrafter.git noinst/libcrafter
 git clone --depth=1 https://github.com/bhesmans/click.git tests/tools/click
-autoreconf -if
-
+./bootstrap.sh
 
 %configure --enable-tests --disable-scripts --prefix=/usr
 make %{?_smp_mflags}
